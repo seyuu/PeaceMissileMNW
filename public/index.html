@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Peace Missile Game</title>
+    <!-- Gerekli Kütüphaneler -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
@@ -16,6 +17,7 @@
 
 function runGame() {
     try {
+        // --- 1. KURULUM ---
         const firebaseConfig = {
             apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
             authDomain: "peacemissile-game.firebaseapp.com",
@@ -30,30 +32,32 @@ function runGame() {
         const tg = window.Telegram.WebApp;
         const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
         
+        // --- 2. PHASER SAHNESİ ---
         class GameScene extends Phaser.Scene {
-            constructor() { super({ key: 'GameScene' }); }
+            constructor() {
+                super({ key: 'GameScene' });
+            }
 
             preload() {
                 const urlParams = new URLSearchParams(window.location.search);
                 this.selectedSide = urlParams.get('side') || 'israel';
                 this.load.image('background', `https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/${this.selectedSide}_bg.jpg`);
                 this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
-                
-                // --- HATANIN DÜZELTİLDİĞİ YER ---
-                this.load.spritesheet('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif', { 
-                    frameWidth: 64, 
-                    frameHeight: 64 
-                });
+                this.load.spritesheet('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif', { frameWidth: 64, frameHeight: 64 });
             }
 
             create() {
                 this.anims.create({ key: 'explode_anim', frames: this.anims.generateFrameNumbers('explosion'), frameRate: 20, repeat: 0, hideOnComplete: true });
                 
-                this.sessionScore = 0; this.health = 3; this.isGameOver = false;
+                this.sessionScore = 0;
+                this.health = 3;
+                this.isGameOver = false;
+
                 let bg = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, 'background');
                 bg.setDisplaySize(this.cameras.main.width, this.cameras.main.height);
 
                 this.buildings = this.physics.add.staticGroup();
+                // Haritaya göre bina sınırları (senin isteğine göre ayarlanabilir)
                 if (this.selectedSide === 'israel') {
                     this.buildings.create(this.cameras.main.width * 0.5, this.cameras.main.height, null).setSize(this.cameras.main.width, 250).setOrigin(0.5, 1).setVisible(false).refreshBody();
                 } else {
@@ -69,7 +73,15 @@ function runGame() {
                 this.time.addEvent({ delay: 1300, callback: this.spawnRocket, callbackScope: this, loop: true });
             }
 
-            spawnRocket() { if (this.isGameOver) return; const t = Phaser.Math.Between(40, this.cameras.main.width - 40); const e = this.rockets.create(t, -100, "rocket"); e.setAngle(180); e.setVelocityY(Phaser.Math.Between(300, 500)); e.setInteractive({ useHandCursor: true }); e.on("pointerdown", () => this.destroyRocket(e)); }
+            spawnRocket() {
+                if (this.isGameOver) return;
+                const x = Phaser.Math.Between(40, this.cameras.main.width - 40);
+                const rocket = this.rockets.create(x, -100, "rocket");
+                rocket.setAngle(180);
+                rocket.setVelocityY(Phaser.Math.Between(300, 500));
+                rocket.setInteractive({ useHandCursor: true });
+                rocket.on("pointerdown", () => this.destroyRocket(rocket));
+            }
             
             destroyRocket(rocket) {
                 if (!rocket.active) return;
@@ -86,7 +98,7 @@ function runGame() {
                 this.healthText.setText("Health: " + this.health);
                 if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("error");
                 let explosionSprite = this.add.sprite(rocket.x, rocket.y, 'explosion');
-                explosionSprite.play('explode_anim').setTint(0xff0000);
+                explosionSprite.play('explode_anim').setTint(0xff0000); // Kırmızı patlama
                 this.cameras.main.shake(100, 0.01);
                 rocket.destroy();
                 if (this.health <= 0) {
@@ -96,7 +108,8 @@ function runGame() {
             
             gameOver() {
                 if (this.isGameOver) return;
-                this.isGameOver = true; this.physics.pause();
+                this.isGameOver = true;
+                this.physics.pause();
                 this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'GAME OVER\nScore: ' + this.sessionScore, { fontSize: '48px', fill: '#ff0000', align: 'center' }).setOrigin(0.5);
                 
                 if (currentUser && this.sessionScore > 0) {
@@ -114,7 +127,13 @@ function runGame() {
             }
         }
         
-        const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade' }, scene: GameScene };
+        const config = {
+            type: Phaser.AUTO,
+            width: window.innerWidth,
+            height: window.innerHeight,
+            physics: { default: 'arcade' },
+            scene: GameScene
+        };
         new Phaser.Game(config);
 
     } catch(e) {
@@ -122,6 +141,7 @@ function runGame() {
     }
 }
 
+// --- BAŞLATICI ---
 if (window.Telegram && window.Telegram.WebApp) {
     window.Telegram.WebApp.ready(runGame);
 } else {
