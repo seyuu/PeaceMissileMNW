@@ -534,8 +534,8 @@
                 // Örneğin: logo_part_1 tam logonun sol üst kısmını temsil ediyorsa,
                 // fullLogoOriginalWidth / 4 ve fullLogoOriginalHeight / 4 gibi değerler kullanılabilir.
                 // Bu örnekte, parçaların hedeflerini daha merkezi yapıyoruz ve scale ile oynayarak büyütme sağlıyoruz.
-                const offsetFactorX =gameWidth  * 0.10; // Yatayda merkeze yaklaşma oranı
-                const offsetFactorY = gameHeight  * 0.27; // Dikeyde merkeze yaklaşma oranı
+                const offsetFactorX =gameWidth  * 0.20; // Yatayda merkeze yaklaşma oranı
+                const offsetFactorY = gameHeight  * 0.7; // Dikeyde merkeze yaklaşma oranı
 
                 this.tweens.add({ targets: this.logoPart1, x: centerX -  offsetFactorX, y: centerY -  offsetFactorY, scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
                 this.tweens.add({ targets: this.logoPart2, x: centerX + offsetFactorX, y: centerY -  offsetFactorY, scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
