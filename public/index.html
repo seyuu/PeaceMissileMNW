@@ -8,8 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
-    <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } canvas { display: block; } </style>
+        <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } canvas { display: block; } </style>
 </head>
 <body>
 <div id="phaser-game"></div>
@@ -17,7 +16,7 @@
     const tg = window.Telegram.WebApp;
     const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
     let db; // Firebase veritabanı nesnesi
-    let userWalletAddress = null; // Kullanıcının cüzdan adresini tutacak
+    // let userWalletAddress = null; // Cüzdan bağlantısı gizlendiği için şimdilik devre dışı bırakıldı
 
     try {
         const firebaseConfig = {
@@ -48,8 +47,8 @@
             this.buildingsDestroyed = 0;
             this.totalBuildings = 0;
             this.healthBar = null; 
-            this.connectWalletButton = null; // Cüzdan bağla düğmesi
-            this.walletAddressText = null; // Cüzdan adresi metni
+            // this.connectWalletButton = null; // Cüzdan bağlantısı gizlendiği için devre dışı bırakıldı
+            // this.walletAddressText = null; // Cüzdan bağlantısı gizlendiği için devre dışı bırakıldı
 
             this.referenceWidth = 1080; // Görselin referans genişliği
             this.referenceHeight = 1920; // Görselin referans yüksekliği
@@ -146,35 +145,32 @@
             this.healthBar = this.add.graphics();
             this.updateHealthBar(); // İlk sağlık çubuğunu çiz
 
-            // Metamask Cüzdan Bağla Düğmesi
+            // Metamask Cüzdan Bağla Düğmesi ve Cüzdan Adresi Metni Şimdilik Gizlendi
+            /*
             this.connectWalletButton = this.add.text(gameWidth - 16, 16, 'Cüzdan Bağla', { 
                 fontSize: '24px', 
                 fill: '#fff', 
-                backgroundColor: '#f6851b', // Metamask turuncusu
+                backgroundColor: '#f6851b', 
                 padding: { x: 10, y: 5 }
             })
-            .setOrigin(1, 0) // Sağ üstten hizala
+            .setOrigin(1, 0)
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => this.connectMetamask());
 
-            // Cüzdan adresi gösterme metni
             this.walletAddressText = this.add.text(gameWidth - 16, 60, 'Cüzdan: Bağlı Değil', { 
                 fontSize: '16px', 
                 fill: '#fff', 
                 stroke: '#000', 
                 strokeThickness: 2 
             })
-            .setOrigin(1, 0); // Sağ üstten hizala
+            .setOrigin(1, 0);
 
-
-            // Kullanıcının cüzdan adresi varsa, baştan göster
             if (userWalletAddress) {
                 this.updateWalletAddressText(userWalletAddress);
             } else {
-                 // Firebase'den mevcut cüzdan adresini kontrol et
                  this.checkExistingWalletAddress();
             }
-
+            */
 
             this.rockets = this.physics.add.group();
             this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this);
@@ -186,12 +182,12 @@
         updateHealthBar() {
             this.healthBar.clear();
             const gameWidth = this.cameras.main.width;
-            const scoreTextBounds = this.scoreText.getBounds(); // Skor metninin boyutlarını al
+            const scoreTextBounds = this.scoreText.getBounds(); 
 
             const healthBarWidth = 200;
             const healthBarHeight = 30;
-            const healthBarX = 16; // Skor metniyle aynı X
-            const healthBarY = scoreTextBounds.bottom + 10; // Skor metninin altından 10 piksel aşağıda
+            const healthBarX = 16; 
+            const healthBarY = scoreTextBounds.bottom + 10; 
 
             let totalCurrentHealth = 0;
             this.buildings.children.each(b => {
@@ -220,21 +216,21 @@
             this.gameTime++;
         }
 
+        // Cüzdan bağlantısı işlevleri şimdilik devre dışı bırakıldı
+        /*
         async connectMetamask() {
             if (typeof window.ethereum !== 'undefined' && typeof ethers !== 'undefined') {
                 try {
-                    // Kullanıcıdan hesapları talep et
                     const provider = new ethers.providers.Web3Provider(window.ethereum);
                     const accounts = await provider.send("eth_requestAccounts", []);
-                    const address = accounts.length > 0 ? accounts[0] : null; // İlk hesabı al
+                    const address = accounts.length > 0 ? accounts[0] : null;
                     
                     if (address) {
-                        userWalletAddress = address; // Global değişkeni güncelle
+                        userWalletAddress = address;
                         this.updateWalletAddressText(address);
-                        this.saveWalletAddress(address); // Firebase'e kaydet
+                        this.saveWalletAddress(address);
                         console.log("Metamask bağlandı:", address);
 
-                        // Hesap değiştiğinde dinleyici ekle (isteğe bağlı)
                         window.ethereum.on('accountsChanged', (newAccounts) => {
                             const newAddress = newAccounts.length > 0 ? newAccounts[0] : null;
                             if (newAddress) {
@@ -255,7 +251,6 @@
 
                 } catch (error) {
                     console.error("Metamask bağlanırken hata:", error);
-                    // Kullanıcı reddederse veya başka bir hata olursa
                     this.walletAddressText.setText("Bağlantı iptal edildi/hata!");
                 }
             } else {
@@ -269,12 +264,12 @@
                 const shortAddress = address.substring(0, 6) + '...' + address.substring(address.length - 4);
                 this.walletAddressText.setText(`Cüzdan: ${shortAddress}`);
                 if (this.connectWalletButton) {
-                    this.connectWalletButton.setVisible(false); // Bağlanınca düğmeyi gizle
+                    this.connectWalletButton.setVisible(false);
                 }
             } else {
                 this.walletAddressText.setText("Cüzdan: Bağlı Değil");
                 if (this.connectWalletButton) {
-                    this.connectWalletButton.setVisible(true); // Bağlı değilse düğmeyi göster
+                    this.connectWalletButton.setVisible(true);
                 }
             }
         }
@@ -311,7 +306,7 @@
                 console.error("Mevcut cüzdan adresini kontrol ederken hata:", error);
             }
         }
-
+        */
 
         spawnRocket() {
             if (this.gameIsOver) return;
@@ -406,7 +401,7 @@
             this.time.delayedCall(150, () => explosion.destroy());
 
             // Güvercin efekti (2 katı büyüklük)
-            const dove = this.add.image(rocket.x, rocket.y, 'dove').setScale(0.4); 
+            const dove = this.add.image(rocket.x, rocket.y, 'dove').setScale(0.2); 
             this.tweens.add({
                 targets: dove,
                 y: dove.y - 100, // Yukarı doğru uçuş efekti
@@ -503,7 +498,7 @@
                 userDocRef.set({ 
                     score: score, 
                     username: currentUser.username || currentUser.first_name || `User${currentUser.id}` 
-                }, { merge: true }) // Merge: Sadece score ve username alanlarını günceller, diğerlerini korur
+                }, { merge: true }) 
                 .then(() => {
                     console.log("Yeni yüksek skor kaydedildi:", score);
                 })
@@ -515,9 +510,6 @@
             }
         }).catch(err => {
             console.error("Skor okuma hatası:", err);
-            // Belge yoksa veya hata oluşursa ve ilk defa kaydediyorsak (veya merge:true işe yaramazsa)
-            // yine de set ile kaydetmeye çalışabiliriz.
-            // Bu kısım genellikle ilk çalıştırmada belge yoksa tetiklenir.
             userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` }, { merge: true })
                 .then(() => console.log("İlk skor veya hata sonrası skor kaydedildi (fallback):", score))
                 .catch(e => console.error("Skor kaydetme hatası (fallback):", e));
