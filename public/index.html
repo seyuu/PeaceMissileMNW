@@ -8,7 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-            <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } canvas { display: block; } </style>
+    <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } canvas { display: block; } </style>
 </head>
 <body>
 <div id="phaser-game"></div>
@@ -17,7 +17,6 @@
     const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
     let db; // Firebase veritabanı nesnesi
 
-    // --- Firebase Kurulumu (Oyunun Dışında) ---
     try {
         const firebaseConfig = {
             apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
@@ -27,28 +26,28 @@
             messagingSenderId: "641906716058",
             appId: "1:641906716058:web:1376e93994fab29f049e23"
         };
-        // Ensure Firebase is loaded before initializing
         if (typeof firebase !== 'undefined') {
             firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
         } else {
-            console.error("Firebase SDK not loaded. Make sure the Firebase scripts are included before this script.");
+            console.error("Firebase SDK yüklenmedi. Firebase betiklerinin bu betikten önce dahil edildiğinden emin olun.");
         }
     } catch (e) {
-        console.error("Firebase initialization failed:", e);
+        console.error("Firebase başlatma başarısız oldu:", e);
     }
 
-    // ... (rest of your GameScene class and other functions remain the same) ...
-    class GameScene extends Phaser.Scene {
+    class GameScene extends Phaser.Scene {
         constructor() {
             super({ key: 'GameScene' });
             this.score = 0;
-            this.health = 3;
+            this.health = 3; // Genel oyun sağlığı (kaç isabete kadar dayanabiliriz)
             this.gameIsOver = false;
+            this.gameTime = 0; // Oyun süresini takip etmek için
+            this.maxBuildingHealth = 3; // Her binanın dayanıklılığı
+            this.buildingsDestroyed = 0; // Yıkılan bina sayısı
         }
 
         preload() {
-            // ... preload içeriği aynı ...
             const urlParams = new URLSearchParams(window.location.search);
             this.selectedSide = urlParams.get('side') || 'israel';
             const bgKey = this.selectedSide === 'iran' ? 'iran_bg' : 'israel_bg';
@@ -56,6 +55,9 @@
             this.load.image('background', bgUrl);
             this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
             this.load.image('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif');
+            // Bina hasar görselleri (varsayımsal - eğer yoksa bu satırları silebiliriz veya varsayılan binaları kullanırız)
+            // Bu örnekte, binalar için ayrı bir hasar görseli kullanmıyorum, bunun yerine patlama efektini büyütüyorum.
+            // Eğer isterseniz, building1_damaged.png gibi görseller yükleyebiliriz.
         }
 
         create() {
@@ -65,34 +67,57 @@
             let bg = this.add.image(gameWidth / 2, gameHeight / 2, 'background');
             bg.setDisplaySize(gameWidth, gameHeight);
 
-            // --- YENİ: HARİTAYA GÖRE BİNA SINIRLARI ---
             this.buildings = this.physics.add.staticGroup();
             
-            // Buradaki koordinatları (x, y, genişlik, yükseklik) kendi arka plan resimlerinize göre ayarlayabilirsiniz.
-            // setOrigin(0.5, 1) kutuyu dikey olarak alttan hizalar.
+            // Her bir bina için sağlık değeri ekleyelim
             if (this.selectedSide === 'israel') {
-                // İsrail (Tel Aviv sahili) için 3 farklı bina bölgesi
-                this.buildings.create(gameWidth * 0.25, gameHeight, null)
-                    .setSize(gameWidth * 0.4, 180) // soldaki binalar
-                    .setOrigin(0.5, 1).setVisible(false).refreshBody();
+                const b1 = this.buildings.create(gameWidth * 0.25, gameHeight, null).setSize(gameWidth * 0.4, 180).setOrigin(0.5, 1).setVisible(false).refreshBody();
+                b1.buildingHealth = this.maxBuildingHealth;
+                b1.initialX = gameWidth * 0.25; // Patlama konumlandırması için orijinal x
+                b1.initialY = gameHeight; // Patlama konumlandırması için orijinal y
+                b1.damageOffset = 0; // Hasar görseli kaydırma
+                
 
-                this.buildings.create(gameWidth * 0.6, gameHeight, null)
-                    .setSize(gameWidth * 0.3, 280) // ortadaki yüksek binalar
-                    .setOrigin(0.5, 1).setVisible(false).refreshBody();
+                const b2 = this.buildings.create(gameWidth * 0.6, gameHeight, null).setSize(gameWidth * 0.3, 280).setOrigin(0.5, 1).setVisible(false).refreshBody();
+                b2.buildingHealth = this.maxBuildingHealth;
+                b2.initialX = gameWidth * 0.6;
+                b2.initialY = gameHeight;
+                b2.damageOffset = 0;
 
-                this.buildings.create(gameWidth * 0.85, gameHeight, null)
-                    .setSize(gameWidth * 0.2, 220) // sağdaki binalar
-                    .setOrigin(0.5, 1).setVisible(false).refreshBody();
+
+                const b3 = this.buildings.create(gameWidth * 0.85, gameHeight, null).setSize(gameWidth * 0.2, 220).setOrigin(0.5, 1).setVisible(false).refreshBody();
+                b3.buildingHealth = this.maxBuildingHealth;
+                b3.initialX = gameWidth * 0.85;
+                b3.initialY = gameHeight;
+                b3.damageOffset = 0;
+
             } else { // iran
-                // İran (İsfahan Meydanı) için 2 geniş bina bölgesi
-                this.buildings.create(gameWidth * 0.3, gameHeight, null)
-                    .setSize(gameWidth * 0.5, 200) // soldaki büyük yapı
-                    .setOrigin(0.5, 1).setVisible(false).refreshBody();
-                    
-                this.buildings.create(gameWidth * 0.8, gameHeight, null)
-                    .setSize(gameWidth * 0.3, 170) // sağdaki yapı
-                    .setOrigin(0.5, 1).setVisible(false).refreshBody();
+                const b1 = this.buildings.create(gameWidth * 0.3, gameHeight, null).setSize(gameWidth * 0.5, 200).setOrigin(0.5, 1).setVisible(false).refreshBody();
+                b1.buildingHealth = this.maxBuildingHealth;
+                b1.initialX = gameWidth * 0.3;
+                b1.initialY = gameHeight;
+                b1.damageOffset = 0;
+
+                const b2 = this.buildings.create(gameWidth * 0.8, gameHeight, null).setSize(gameWidth * 0.3, 170).setOrigin(0.5, 1).setVisible(false).refreshBody();
+                b2.buildingHealth = this.maxBuildingHealth;
+                b2.initialX = gameWidth * 0.8;
+                b2.initialY = gameHeight;
+                b2.damageOffset = 0;
             }
+
+            // Binaların görselini göstermek için yeni bir katman ekleyelim (hasar görselleri için)
+            // Şu an için sadece patlama efektiyle idare ediyoruz.
+            // Eğer hasarlı bina görselleriniz olsaydı, burada yönetirdik.
+            this.buildingGraphics = this.add.group();
+            this.buildings.children.each(building => {
+                // Şimdilik sadece placeHolder bir grafik oluşturalım, gerçek görsel yerine.
+                // Eğer hasarlı bina görselleri olsaydı, burada yükleyip atardık.
+                // Örneğin: let img = this.add.image(building.initialX, building.initialY - (building.body.height / 2), 'building_intact');
+                // img.setOrigin(0.5, 0.5);
+                // building.sprite = img;
+                // this.buildingGraphics.add(img);
+            });
+
 
             this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
             this.healthText = this.add.text(gameWidth - 16, 16, 'Health: ' + this.health, { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 }).setOrigin(1, 0);
@@ -100,45 +125,183 @@
             this.rockets = this.physics.add.group();
             this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this);
             
-            this.time.addEvent({ delay: 1300, callback: this.spawnRocket, callbackScope: this, loop: true });
+            this.time.addEvent({ delay: 1500, callback: this.spawnRocket, callbackScope: this, loop: true }); // Roketleri biraz daha yavaş başlatalım
+            this.time.addEvent({ delay: 1000, callback: this.increaseGameTime, callbackScope: this, loop: true }); // Oyun süresi sayacı
         }
-        
-        // Geri kalan tüm fonksiyonlar (spawnRocket, destroyRocket, hitBuilding, gameOver) BİREBİR AYNI KALIYOR
-        spawnRocket(){if(this.gameIsOver)return;const t=Phaser.Math.Between(40,this.cameras.main.width-40),e=this.rockets.create(t,-100,"rocket");e.setAngle(180),e.setVelocityY(Phaser.Math.Between(300,500)),e.setInteractive({useHandCursor:!0}),e.on("pointerdown",()=>this.destroyRocket(e))}
-        destroyRocket(t){if(!t.active)return;this.score+=10,this.scoreText.setText("Score: "+this.score);const e=this.add.image(t.x,t.y,"explosion").setScale(.5);this.time.delayedCall(150,()=>e.destroy()),t.destroy()}
-        hitBuilding(t,e){if(!t.active)return;this.health-=1,this.healthText.setText("Health: "+this.health),window.Telegram&&window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");const o=this.add.image(t.x,t.y+20,"explosion").setScale(.8).setTint(16711680);this.time.delayedCall(200,()=>o.destroy()),this.cameras.main.shake(100,.01),t.destroy(),this.health<=0&&this.gameOver()}
-        gameOver(){this.gameIsOver=!0,this.physics.pause();const t=this.cameras.main.width,e=this.cameras.main.height;this.add.rectangle(t/2,e/2,t,e,0,.7),this.add.text(t/2,e/2,"GAME OVER\nFinal Score: "+this.score,{fontSize:"48px",fill:"#ff0000",align:"center"}).setOrigin(.5),
-                // Call saveScore when game is over
-                saveScore(this.score);
-                window.Telegram&&window.Telegram.WebApp&&this.time.delayedCall(4e3,()=>window.Telegram.WebApp.close())}
+
+        increaseGameTime() {
+            this.gameTime++;
+        }
+
+        spawnRocket() {
+            if (this.gameIsOver) return;
+
+            const gameWidth = this.cameras.main.width;
+            const gameHeight = this.cameras.main.height;
+
+            let startX, startY, velocityX, velocityY, angle;
+            let spawnType = Phaser.Math.Between(0, 100); // Roket geliş türü için rastgele bir sayı
+
+            // Oyun süresine göre zorluğu artıralım
+            let baseSpeed = 150 + (this.gameTime * 2); // Zamanla hız artsın
+            let maxSpeed = 400 + (this.gameTime * 5); // Maksimum hız da artsın
+            if (baseSpeed > 600) baseSpeed = 600; // Hız limiti
+            if (maxSpeed > 800) maxSpeed = 800; // Hız limiti
+
+            // Yıkılan bina sayısına göre roketlerin daha agresif gelmesini sağlayabiliriz
+            let buildingDamageBonus = this.buildingsDestroyed * 50; // Yıkılan her bina için hız bonusu
+            baseSpeed += buildingDamageBonus;
+            maxSpeed += buildingDamageBonus;
+
+
+            // Başlangıçta daha çok dikey, zamanla daha çok yatay/kavisli
+            if (this.gameTime < 10 || spawnType < 70) { // İlk 10 saniye veya rastgele olarak çoğunlukla yukarıdan
+                // Yukarıdan aşağıya inen roket (mevcut mekanik)
+                startX = Phaser.Math.Between(40, gameWidth - 40);
+                startY = -100;
+                velocityY = Phaser.Math.Between(baseSpeed, maxSpeed);
+                velocityX = 0;
+                angle = 180; // Dikey iniş
+            } else {
+                // Yanlardan, kavisli gelen roketler (İsrail için deniz, İran için genel yanlardan)
+                let side = Phaser.Math.Between(0, 1) === 0 ? 'left' : 'right'; // Soldan mı sağdan mı gelecek?
+
+                if (side === 'left') {
+                    startX = -100; // Ekranın solundan
+                    // Hedef olarak binaların ortalama yüksekliğini alalım
+                    const targetY = Phaser.Math.Between(gameHeight * 0.6, gameHeight * 0.9); 
+                    startY = Phaser.Math.Between(targetY - 150, targetY + 50); // Biraz daha rastgele başlangıç yüksekliği
+                    
+                    velocityX = Phaser.Math.Between(baseSpeed, maxSpeed);
+                    velocityY = Phaser.Math.Between(-baseSpeed / 2, baseSpeed / 2); // Hafif yukarı veya aşağı eğim
+                    angle = 90 + Phaser.Math.Between(-30, 30); // Sağa doğru, hafif açılı
+                } else { // 'right'
+                    startX = gameWidth + 100; // Ekranın sağından
+                    const targetY = Phaser.Math.Between(gameHeight * 0.6, gameHeight * 0.9);
+                    startY = Phaser.Math.Between(targetY - 150, targetY + 50);
+
+                    velocityX = Phaser.Math.Between(-maxSpeed, -baseSpeed); // Sola doğru
+                    velocityY = Phaser.Math.Between(-baseSpeed / 2, baseSpeed / 2); // Hafif yukarı veya aşağı eğim
+                    angle = -90 + Phaser.Math.Between(-30, 30); // Sola doğru, hafif açılı
+                }
+            }
+
+            const rocket = this.rockets.create(startX, startY, "rocket");
+            rocket.setAngle(angle);
+            rocket.setVelocity(velocityX, velocityY);
+            rocket.setInteractive({ useHandCursor: true });
+            rocket.on("pointerdown", () => this.destroyRocket(rocket));
+
+            // Ekran dışına çıkan roketleri temizle
+            rocket.setCollideWorldBounds(false);
+            rocket.body.onWorldBounds = true;
+            this.physics.world.on('worldbounds', (body) => {
+                if (body.gameObject === rocket && !this.gameIsOver) {
+                    // Eğer roket ekran dışına çıkar ve bir binaya çarpmadan kaybolursa
+                    // Bu durumda can azalmayacak, sadece skor artmayacak.
+                    // Eğer can azaltmak istersek, burada da health-- yapabiliriz.
+                    rocket.destroy();
+                }
+            }, this);
+        }
+
+        destroyRocket(rocket) {
+            if (!rocket.active || this.gameIsOver) return; // Zaten pasif veya oyun bittiyse işlem yapma
+
+            this.score += 10;
+            this.scoreText.setText("Score: " + this.score);
+
+            const explosion = this.add.image(rocket.x, rocket.y, "explosion").setScale(0.5); // Normal patlama
+            this.time.delayedCall(150, () => explosion.destroy());
+            rocket.destroy(); // Roketi imha et
+        }
+
+        hitBuilding(rocket, building) {
+            if (!rocket.active || !building.body.enable || this.gameIsOver) return; // Zaten pasif veya oyun bittiyse işlem yapma
+
+            // Binanın sağlığını azalt
+            building.buildingHealth--;
+            
+            // Genel oyun sağlığını azalt (her vuruşta)
+            this.health--;
+            this.healthText.setText("Health: " + this.health);
+            window.Telegram && window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");
+
+            // Bina darbe aldığında patlama efekti (daha büyük olabilir)
+            const explosion = this.add.image(rocket.x, rocket.y + 20, "explosion").setScale(1.2).setTint(0xFF0000); // Daha büyük kırmızımsı patlama
+            this.time.delayedCall(300, () => explosion.destroy()); // Patlamayı biraz daha uzun göster
+
+            this.cameras.main.shake(200, 0.02); // Sarsıntıyı artır
+
+            rocket.destroy(); // Roketi imha et
+
+            if (building.buildingHealth <= 0) {
+                // Bina tamamen yıkıldı!
+                this.buildingsDestroyed++;
+                building.body.enable = false; // Çarpışmayı durdur
+                building.setVisible(false); // Görsel olarak da görünmez yap (veya hasarlı/yıkılmış bir görsel kullan)
+
+                // Büyük bir patlama efekti
+                const finalExplosion = this.add.image(building.initialX, building.initialY - (building.body.height / 2), "explosion").setScale(2).setTint(0x800000); // Büyük ve koyu patlama
+                this.time.delayedCall(500, () => finalExplosion.destroy());
+
+                // Eğer tüm binalar yıkıldıysa, oyunu bitir
+                const allBuildingsDestroyed = this.buildings.children.entries.every(b => b.buildingHealth <= 0);
+                if (allBuildingsDestroyed) {
+                    this.gameOver();
+                    return; // Erken çıkış
+                }
+            }
+
+            if (this.health <= 0) {
+                this.gameOver();
+            }
+        }
+
+        gameOver() {
+            if (this.gameIsOver) return; // Zaten oyun bittiyse tekrar çağırma
+            this.gameIsOver = true;
+            this.physics.pause(); // Fizik motorunu durdur
+
+            // Tüm roketleri temizle
+            this.rockets.children.each(rocket => rocket.destroy());
+            
+            const gameWidth = this.cameras.main.width;
+            const gameHeight = this.cameras.main.height;
+
+            this.add.rectangle(gameWidth / 2, gameHeight / 2, gameWidth, gameHeight, 0, 0.7); // Yarı saydam arka plan
+            this.add.text(gameWidth / 2, gameHeight / 2, "OYUN BİTTİ\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
+            
+            saveScore(this.score); // Skoru kaydet
+
+            // Telegram Web App'i kapatmadan önce biraz bekle
+            window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
+        }
     }
 
-       // --- Skoru Kaydeden Bağımsız Fonksiyon ---
     function saveScore(score) {
         if (!db) {
-            console.error("Firebase Firestore is not initialized. Score cannot be saved.");
+            console.error("Firebase Firestore başlatılmadı. Skor kaydedilemiyor.");
             return;
         }
         if (!currentUser || !currentUser.id) {
-            console.warn("Telegram user data not available. Score will not be saved to a specific user.");
-            // Optionally, you might want to save to a "guest" or anonymous user
-            // or just skip saving if no user is present.
+            console.warn("Telegram kullanıcı verileri mevcut değil. Skor belirli bir kullanıcıya kaydedilmeyecek.");
             return;
         }
 
         const userDocRef = db.collection('users').doc(String(currentUser.id));
         userDocRef.update({
             score: firebase.firestore.FieldValue.increment(score),
-            username: currentUser.username || currentUser.first_name
+            username: currentUser.username || currentUser.first_name || `User${currentUser.id}` // Kullanıcı adı yoksa ID ile oluştur
         }).catch(err => {
             if (err.code === 'not-found') {
-                userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name });
-            } else { console.error("Firebase Error:", err); }
+                userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` });
+            } else { console.error("Firebase Hatası:", err); }
         });
     }
-    // --- Oyun Başlangıcı ---
+
     const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade', arcade: { gravity: { y: 0 } } }, scene: GameScene };
-    try { const game = new Phaser.Game(config); } catch (e) { document.body.innerHTML = `<h1 style="color:red;">ERROR: ${e.message}</h1>`; }
+    try { const game = new Phaser.Game(config); } catch (e) { document.body.innerHTML = `<h1 style="color:red;">HATA: ${e.message}</h1>`; }
 </script>
 </body>
 </html>
