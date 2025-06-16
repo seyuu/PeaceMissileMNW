@@ -397,11 +397,11 @@
             this.scoreText.setText("Score: " + this.score);
 
             // Patlama efekti (2 katı büyüklük)
-            const explosion = this.add.image(rocket.x, rocket.y, "explosion").setScale(1.0); 
+            const explosion = this.add.image(rocket.x, rocket.y, "explosion").setScale(2.0); 
             this.time.delayedCall(150, () => explosion.destroy());
 
             // Güvercin efekti (2 katı büyüklük)
-            const dove = this.add.image(rocket.x, rocket.y, 'dove').setScale(0.2); 
+            const dove = this.add.image(rocket.x, rocket.y, 'dove').setScale(0.4); 
             this.tweens.add({
                 targets: dove,
                 y: dove.y - 100, // Yukarı doğru uçuş efekti
