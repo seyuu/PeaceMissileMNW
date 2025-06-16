@@ -58,12 +58,12 @@
         preload() {
             const urlParams = new URLSearchParams(window.location.search);
             this.selectedSide = urlParams.get('side') || 'israel';
-            
-            // Önemli: Eğer arka plan görselleriniz yerel olarak oyununuzla aynı klasördeyse,
-            // veya 'assets' gibi bir klasörde ise, aşağıdaki yolu buna göre ayarlayın.
-            // Örneğin, eğer 'assets' klasöründeyse: 'assets/iran_bg.jpg'
-            const bgFileName = this.selectedSide === 'iran' ? 'iran_bg.jpg' : 'israel_bg.jpg';
-            this.load.image('background', bgFileName); // Yerel dosya adı kullanıldı
+            
+            // Görselleri doğrudan GitHub linklerinden yükle
+            const bgUrl = this.selectedSide === 'iran' 
+                ? 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/iran_bg.jpg' 
+                : 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/israel_bg.jpg';
+            this.load.image('background', bgUrl);
 
             this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
             this.load.image('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif');
@@ -133,7 +133,7 @@
                     .setOrigin(0.5, 0) // Üst ortaya hizala
                     .setVisible(false) 
                     .refreshBody();
-
+                
                 buildingBody.buildingHealth = this.maxBuildingHealth;
                 buildingBody.totalHealth = this.maxBuildingHealth; 
                 buildingBody.visualX = data.x; 
@@ -227,7 +227,7 @@
                     const provider = new ethers.providers.Web3Provider(window.ethereum);
                     const accounts = await provider.send("eth_requestAccounts", []);
                     const address = accounts.length > 0 ? accounts[0] : null; // İlk hesabı al
-
+                    
                     if (address) {
                         userWalletAddress = address; // Global değişkeni güncelle
                         this.updateWalletAddressText(address);
@@ -336,7 +336,7 @@
             if (activeBuildings.length > 0) {
                 targetBuilding = Phaser.Utils.Array.GetRandom(activeBuildings);
             }
-
+            
             let targetX, targetY;
             if (targetBuilding) {
                 targetX = targetBuilding.x + Phaser.Math.Between(-targetBuilding.body.width / 4, targetBuilding.body.width / 4);
@@ -350,7 +350,7 @@
             if (this.gameTime < 10 || spawnType < 70) {
                 startX = Phaser.Math.Between(40, gameWidth - 40);
                 startY = -100;
-
+                
                 const angleToTarget = Phaser.Math.Angle.Between(startX, startY, targetX, targetY);
                 const speed = Phaser.Math.Between(baseSpeed, maxSpeed);
                 velocityX = Math.cos(angleToTarget) * speed;
@@ -362,7 +362,7 @@
                 if (side === 'left') {
                     startX = -100;
                     startY = Phaser.Math.Between(gameHeight * 0.3, gameHeight * 0.7); 
-
+                    
                     const angleToTarget = Phaser.Math.Angle.Between(startX, startY, targetX, targetY);
                     const speed = Phaser.Math.Between(baseSpeed, maxSpeed);
                     velocityX = Math.cos(angleToTarget) * speed;
@@ -371,7 +371,7 @@
                 } else { 
                     startX = gameWidth + 100;
                     startY = Phaser.Math.Between(gameHeight * 0.3, gameHeight * 0.7);
-
+                    
                     const angleToTarget = Phaser.Math.Angle.Between(startX, startY, targetX, targetY);
                     const speed = Phaser.Math.Between(baseSpeed, maxSpeed);
                     velocityX = Math.cos(angleToTarget) * speed;
@@ -402,11 +402,11 @@
             this.scoreText.setText("Score: " + this.score);
 
             // Patlama efekti (2 katı büyüklük)
-            const explosion = this.add.image(rocket.x, rocket.y, "explosion").setScale(1.0); // 0.5 * 2 = 1.0
+            const explosion = this.add.image(rocket.x, rocket.y, "explosion").setScale(1.0); 
             this.time.delayedCall(150, () => explosion.destroy());
 
             // Güvercin efekti (2 katı büyüklük)
-            const dove = this.add.image(rocket.x, rocket.y, 'dove').setScale(0.2); // 0.1 * 2 = 0.2
+            const dove = this.add.image(rocket.x, rocket.y, 'dove').setScale(0.4); 
             this.tweens.add({
                 targets: dove,
                 y: dove.y - 100, // Yukarı doğru uçuş efekti
@@ -425,7 +425,7 @@
             if (!rocket.active || !building.body.enable || this.gameIsOver) return;
 
             building.buildingHealth--; 
-
+            
             window.Telegram && window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");
 
             const explosion = this.add.image(rocket.x, rocket.y + 20, "explosion").setScale(1.2).setTint(0xFF0000);
@@ -441,7 +441,7 @@
 
                 const destroyedSprite = this.add.image(building.visualX, building.visualY, 'destroyed_building');
                 destroyedSprite.setOrigin(0.5, 0.5); 
-
+                
                 // Krateri binanın fiziksel kutusuna göre ölçekle ve %100 daha büyük yap (2 katı)
                 // building.visualWidth ve building.visualHeight, çarpışma kutusunun oranlanmış boyutlarıdır.
                 // destroyedSprite.width ve destroyedSprite.height, yüklenen destroyed_building.png'nin orijinal piksel boyutlarıdır.
@@ -467,13 +467,13 @@
             this.physics.pause();
 
             this.rockets.children.each(rocket => rocket.destroy());
-
+            
             const gameWidth = this.cameras.main.width;
             const gameHeight = this.cameras.main.height;
 
             this.add.rectangle(gameWidth / 2, gameHeight / 2, gameWidth, gameHeight, 0, 0.7);
             this.add.text(gameWidth / 2, gameHeight / 2, "OYUN BİTTİ\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
-
+            
             saveScore(this.score); // Skoru kaydetmek için çağır
 
             window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
