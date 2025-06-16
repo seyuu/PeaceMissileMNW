@@ -71,71 +71,66 @@
             bg.setDisplaySize(gameWidth, gameHeight);
 
             this.buildings = this.physics.add.staticGroup();
-            this.destroyedBuildingSprites = this.add.group(); // Yıkık bina görsellerini tutacak grup
+            this.destroyedBuildingSprites = this.add.group(); 
             
             const buildingsData = [];
 
             // Bina koordinatları ve boyutları (referans çözünürlüğe göre oranlı)
+            // Y pozisyonları, binanın en üst pikselinden (veya çatısından) itibaren.
+            // Height ise bu üst noktadan aşağıya doğru kutunun yüksekliği.
             if (this.selectedSide === 'israel') {
-                // İsrail (Tel Aviv sahili) için güncellenmiş koordinatlar
-                // X, Y koordinatları ve Genişlik, Yükseklik (referans piksel değerleri)
-                // visualOffsetY: Kraterin konumunu dikeyde ayarlamak için.
-                // Oranları mevcut ekran boyutuna uyarlayarak gerçek piksel değerlerini elde ediyoruz.
                 buildingsData.push({ 
                     x: (550 / this.referenceWidth) * gameWidth, 
-                    y: gameHeight, // Tabana hizalı
+                    yOffsetFromBottom: 450, // Binanın tabanından kaç piksel yukarıda başlıyor (referans resimde)
                     width: (400 / this.referenceWidth) * gameWidth, 
-                    height: (620 / this.referenceHeight) * gameHeight, 
-                    visualOffsetY: -((620 / this.referenceHeight) * gameHeight * 0.5) // Kraterin ortası binanın ortasına denk gelsin
+                    height: 300 // Çarpışma kutusu yüksekliği (referans resimde)
                 });
                 buildingsData.push({ 
                     x: (750 / this.referenceWidth) * gameWidth, 
-                    y: gameHeight, 
+                    yOffsetFromBottom: 550, 
                     width: (300 / this.referenceWidth) * gameWidth, 
-                    height: (520 / this.referenceHeight) * gameHeight,
-                    visualOffsetY: -((520 / this.referenceHeight) * gameHeight * 0.5)
+                    height: 350 
                 });
                 buildingsData.push({ 
                     x: (950 / this.referenceWidth) * gameWidth, 
-                    y: gameHeight, 
+                    yOffsetFromBottom: 400, 
                     width: (200 / this.referenceWidth) * gameWidth, 
-                    height: (420 / this.referenceHeight) * gameHeight,
-                    visualOffsetY: -((420 / this.referenceHeight) * gameHeight * 0.5)
+                    height: 250 
                 });
             } else { // iran
-                // İran (İsfahan Meydanı) için güncellenmiş koordinatlar
                 buildingsData.push({ 
                     x: (325 / this.referenceWidth) * gameWidth, 
-                    y: gameHeight, 
+                    yOffsetFromBottom: 400, 
                     width: (550 / this.referenceWidth) * gameWidth, 
-                    height: (620 / this.referenceHeight) * gameHeight,
-                    visualOffsetY: -((620 / this.referenceHeight) * gameHeight * 0.5)
+                    height: 300 
                 });
                 buildingsData.push({ 
                     x: (825 / this.referenceWidth) * gameWidth, 
-                    y: gameHeight, 
+                    yOffsetFromBottom: 350, 
                     width: (350 / this.referenceWidth) * gameWidth, 
-                    height: (520 / this.referenceHeight) * gameHeight,
-                    visualOffsetY: -((520 / this.referenceHeight) * gameHeight * 0.5)
+                    height: 250 
                 });
             }
 
             this.totalBuildings = buildingsData.length;
 
             buildingsData.forEach((data) => {
-                const buildingBody = this.buildings.create(data.x, data.y, null)
-                    .setSize(data.width, data.height)
-                    .setOrigin(0.5, 1) // Alt ortaya hizala
-                    .setVisible(false) // Fiziksel kutu görünmez kalır
+                // Y koordinatını ekranın altından yOffsetFromBottom kadar yukarıya ayarla
+                const yPos = gameHeight - (data.yOffsetFromBottom / this.referenceHeight) * gameHeight;
+                const buildingHeight = (data.height / this.referenceHeight) * gameHeight;
+
+                const buildingBody = this.buildings.create(data.x, yPos, null)
+                    .setSize(data.width, buildingHeight)
+                    .setOrigin(0.5, 0) // Üst ortaya hizala
+                    .setVisible(false) 
                     .refreshBody();
                 
                 buildingBody.buildingHealth = this.maxBuildingHealth;
                 buildingBody.totalHealth = this.maxBuildingHealth; 
-                buildingBody.visualX = data.x; // Kraterin yerleşeceği X
-                // Kraterin binanın üst kısmına değil, genel ortasına veya biraz altına yerleşmesi için ayarlandı
-                buildingBody.visualY = data.y + data.visualOffsetY; 
-                buildingBody.visualWidth = data.width; // Kraterin ölçekleneceği referans genişlik
-                buildingBody.visualHeight = data.height; // Kraterin ölçekleneceği referans yükseklik
+                buildingBody.visualX = data.x; 
+                buildingBody.visualY = yPos + (buildingHeight * 0.5); // Kraterin binanın orta seviyesine denk gelmesi için
+                buildingBody.visualWidth = data.width; 
+                buildingBody.visualHeight = buildingHeight; 
             });
 
             this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
@@ -202,7 +197,7 @@
             baseSpeed += buildingDamageBonus;
             maxSpeed += buildingDamageBonus;
 
-            // Rastgele bir hedef bina seçelim (yıkılmamış olanlardan)
+            // Yıkılmamış aktif binalardan rastgele birini hedefle
             const activeBuildings = this.buildings.children.entries.filter(b => b.body.enable);
             let targetBuilding = null;
             if (activeBuildings.length > 0) {
@@ -211,9 +206,10 @@
             
             let targetX, targetY;
             if (targetBuilding) {
-                // Hedef bina varsa, o binanın çarpışma kutusunun üst kısmına doğru git
+                // Roket, binanın çarpışma kutusunun üst yarısına veya çatısına doğru yönelsin
+                // targetBuilding.y = çarpışma kutusunun üst kenarının Y koordinatı
                 targetX = targetBuilding.x + Phaser.Math.Between(-targetBuilding.body.width / 4, targetBuilding.body.width / 4);
-                targetY = targetBuilding.y - targetBuilding.body.height + Phaser.Math.Between(0, targetBuilding.body.height / 2); // Binanın üst yarısı
+                targetY = targetBuilding.y + Phaser.Math.Between(0, targetBuilding.body.height / 3); // Binanın en üst 1/3'lük kısmını hedefle
             } else {
                 // Hedef bina kalmadıysa, ekranın alt ortasını hedefle
                 targetX = gameWidth / 2;
@@ -300,13 +296,10 @@
                 building.body.enable = false; 
                 building.setVisible(false); 
 
-                // Yıkık bina görselini ekle (krater)
                 const destroyedSprite = this.add.image(building.visualX, building.visualY, 'destroyed_building');
-                destroyedSprite.setOrigin(0.5, 0.5); // Kraterin merkezi konumlandırma için
+                destroyedSprite.setOrigin(0.5, 0.5); 
                 
-                // Krateri binanın fiziksel kutusuna göre ölçekle
-                // Örnek: Kraterin genişliğini binanın genişliğinin %70'i kadar yap
-                const scaleFactor = Math.min(building.visualWidth / destroyedSprite.width, building.visualHeight / destroyedSprite.height) * 0.7;
+                const scaleFactor = Math.min(building.visualWidth / destroyedSprite.width, building.visualHeight / destroyedSprite.height) * 0.7; 
                 destroyedSprite.setScale(scaleFactor); 
                 this.destroyedBuildingSprites.add(destroyedSprite);
 
