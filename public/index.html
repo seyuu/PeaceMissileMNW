@@ -1,47 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Peace Missile Game</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Peace Missile Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-        <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } canvas { display: block; } </style>
+        <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } canvas { display: block; } </style>
 </head>
 <body>
 <div id="phaser-game"></div>
 <script type="text/javascript">
-    const tg = window.Telegram.WebApp;
-    const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
-    let db; // Firebase veritabanı nesnesi
+    const tg = window.Telegram.WebApp;
+    const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
+    let db; // Firebase veritabanı nesnesi
     // let userWalletAddress = null; // Cüzdan bağlantısı gizlendiği için şimdilik devre dışı bırakıldı
 
-    try {
-        const firebaseConfig = {
-            apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
-            authDomain: "peacemissile-game.firebaseapp.com",
-            projectId: "peacemissile-game",
-            storageBucket: "peacemissile-game.firebasestorage.app",
-            messagingSenderId: "641906716058",
-            appId: "1:641906716058:web:1376e93994fab29f049e23"
-        };
-        if (typeof firebase !== 'undefined') {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-        } else {
-            console.error("Firebase SDK yüklenmedi. Firebase betiklerinin bu betikten önce dahil edildiğinden emin olun.");
-        }
-    } catch (e) {
-        console.error("Firebase başlatma başarısız oldu:", e);
-    }
+    try {
+        const firebaseConfig = {
+            apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
+            authDomain: "peacemissile-game.firebaseapp.com",
+            projectId: "peacemissile-game",
+            storageBucket: "peacemissile-game.firebasestorage.app",
+            messagingSenderId: "641906716058",
+            appId: "1:641906716058:web:1376e93994fab29f049e23"
+        };
+        if (typeof firebase !== 'undefined') {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+        } else {
+            console.error("Firebase SDK yüklenmedi. Firebase betiklerinin bu betikten önce dahil edildiğinden emin olun.");
+        }
+    } catch (e) {
+        console.error("Firebase başlatma başarısız oldu:", e);
+    }
 
-    class GameScene extends Phaser.Scene {
-        constructor() {
-            super({ key: 'GameScene' });
-            this.score = 0;
-            this.gameIsOver = false;
+    class GameScene extends Phaser.Scene {
+        constructor() {
+            super({ key: 'GameScene' });
+            this.score = 0;
+            this.gameIsOver = false;
             this.gameTime = 0;
             this.maxBuildingHealth = 3; 
             this.buildingsDestroyed = 0;
@@ -53,54 +53,54 @@
             this.referenceWidth = 1080; // Görselin referans genişliği
             this.referenceHeight = 1920; // Görselin referans yüksekliği
 
-             // Logo parçaları referansları
+            // Logo parçaları referansları
             this.logoPart1 = null;
-        this.logoPart2 = null;
-        this.logoPart3 = null;
-        this.logoPart4 = null;
-        this.fullLogo = null;
-        }
+            this.logoPart2 = null;
+            this.logoPart3 = null;
+            this.logoPart4 = null;
+            this.fullLogo = null;
+        }
 
-        preload() {
-            const urlParams = new URLSearchParams(window.location.search);
-            this.selectedSide = urlParams.get('side') || 'israel';
+        preload() {
+            const urlParams = new URLSearchParams(window.location.search);
+            this.selectedSide = urlParams.get('side') || 'israel';
             
             // Görselleri doğrudan GitHub linklerinden yükle
             const bgUrl = this.selectedSide === 'iran' 
                 ? 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/iran_bg.jpg' 
                 : 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/israel_bg.jpg';
-            this.load.image('background', bgUrl);
+            this.load.image('background', bgUrl);
 
-            this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
-            this.load.image('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif');
+            this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
+            this.load.image('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif');
             this.load.image('destroyed_building', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/destroyed_building.png'); 
             this.load.image('dove', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/dove.png'); 
-       
-             // Logo parçalarını yükle (isimler ekran görüntüsüne göre)
-        this.load.image('logo_part_1', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_1.png');
-        this.load.image('logo_part_2', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_2.png');
-        this.load.image('logo_part_3', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_3.png');
-        this.load.image('logo_part_4', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_4.png');
-        this.load.image('full_logo', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo.png'); 
-         }
+           
+            // Logo parçalarını yükle (isimler ekran görüntüsüne göre)
+            this.load.image('logo_part_1', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_1.png');
+            this.load.image('logo_part_2', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_2.png');
+            this.load.image('logo_part_3', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_3.png');
+            this.load.image('logo_part_4', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_4.png');
+            this.load.image('full_logo', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo.png'); 
+        }
 
-        create() {
-            const gameWidth = this.cameras.main.width;
-            const gameHeight = this.cameras.main.height;
+        create() {
+            const gameWidth = this.cameras.main.width;
+            const gameHeight = this.cameras.main.height;
 
             // Arka planı ekran boyutuna göre ayarla
-            let bg = this.add.image(gameWidth / 2, gameHeight / 2, 'background');
-            bg.setDisplaySize(gameWidth, gameHeight);
+            let bg = this.add.image(gameWidth / 2, gameHeight / 2, 'background');
+            bg.setDisplaySize(gameWidth, gameHeight);
 
-            this.buildings = this.physics.add.staticGroup();
+            this.buildings = this.physics.add.staticGroup();
             this.destroyedBuildingSprites = this.add.group(); 
-            
-            const buildingsData = [];
+            
+            const buildingsData = [];
 
             // Bina koordinatları ve boyutları (referans çözünürlüğe göre oranlı)
             // Y pozisyonları, binanın en üst pikselinden (veya çatısından) itibaren.
             // Height ise bu üst noktadan aşağıya doğru kutunun yüksekliği.
-            if (this.selectedSide === 'israel') {
+            if (this.selectedSide === 'israel') {
                 buildingsData.push({ 
                     x: (550 / this.referenceWidth) * gameWidth, 
                     yOffsetFromBottom: 450, 
@@ -119,7 +119,7 @@
                     width: (200 / this.referenceWidth) * gameWidth, 
                     height: 250 
                 });
-            } else { // iran
+            } else { // iran
                 buildingsData.push({ 
                     x: (325 / this.referenceWidth) * gameWidth, 
                     yOffsetFromBottom: 400, 
@@ -132,7 +132,7 @@
                     width: (350 / this.referenceWidth) * gameWidth, 
                     height: 250 
                 });
-            }
+            }
 
             this.totalBuildings = buildingsData.length;
 
@@ -155,7 +155,7 @@
                 buildingBody.visualHeight = buildingHeight; 
             });
 
-            this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
+            this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
             this.healthBar = this.add.graphics();
             this.updateHealthBar(); // İlk sağlık çubuğunu çiz
 
@@ -186,22 +186,22 @@
             }
             */
 
-            this.rockets = this.physics.add.group();
-            this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this);
-            
-            this.time.addEvent({ delay: 1500, callback: this.spawnRocket, callbackScope: this, loop: true });
+            this.rockets = this.physics.add.group();
+            this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this);
+            
+            this.time.addEvent({ delay: 1500, callback: this.spawnRocket, callbackScope: this, loop: true });
             this.time.addEvent({ delay: 1000, callback: this.increaseGameTime, callbackScope: this, loop: true });
 
             // Logo parçalarını ve tam logoyu (opsiyonel) oluştur ve gizle
-        const logoScale = 0.25; // Başlangıç ölçeği, gerekirse ayarla
-        const fullLogoScale = 0.5; // Tam logo ölçeği, gerekirse ayarla
+            const logoScale = 0.25; // Başlangıç ölçeği, gerekirse ayarla
+            const fullLogoScale = 0.5; // Tam logo ölçeği, gerekirse ayarla
 
-        this.logoPart1 = this.add.image(0, 0, 'logo_part_1').setVisible(false).setScale(logoScale);
-        this.logoPart2 = this.add.image(0, 0, 'logo_part_2').setVisible(false).setScale(logoScale);
-        this.logoPart3 = this.add.image(0, 0, 'logo_part_3').setVisible(false).setScale(logoScale);
-        this.logoPart4 = this.add.image(0, 0, 'logo_part_4').setVisible(false).setScale(logoScale);
-        this.fullLogo = this.add.image(gameWidth / 2, gameHeight / 2, 'full_logo').setVisible(false).setScale(fullLogoScale); // Opsiyonel
-        }
+            this.logoPart1 = this.add.image(0, 0, 'logo_part_1').setVisible(false).setScale(logoScale);
+            this.logoPart2 = this.add.image(0, 0, 'logo_part_2').setVisible(false).setScale(logoScale);
+            this.logoPart3 = this.add.image(0, 0, 'logo_part_3').setVisible(false).setScale(logoScale);
+            this.logoPart4 = this.add.image(0, 0, 'logo_part_4').setVisible(false).setScale(logoScale);
+            this.fullLogo = this.add.image(gameWidth / 2, gameHeight / 2, 'full_logo').setVisible(false).setScale(fullLogoScale); // Opsiyonel
+        }
 
         updateHealthBar() {
             this.healthBar.clear();
@@ -332,7 +332,7 @@
         }
         */
 
-        spawnRocket() {
+        spawnRocket() {
             if (this.gameIsOver) return;
 
             const gameWidth = this.cameras.main.width;
@@ -414,7 +414,7 @@
             }, this);
         }
 
-        destroyRocket(rocket) {
+        destroyRocket(rocket) {
             if (!rocket.active || this.gameIsOver) return;
 
             this.score += 10;
@@ -438,9 +438,9 @@
             });
 
             rocket.destroy();
-        }
+        }
 
-        hitBuilding(rocket, building) {
+        hitBuilding(rocket, building) {
             if (!rocket.active || !building.body.enable || this.gameIsOver) return;
 
             building.buildingHealth--; 
@@ -475,76 +475,92 @@
 
             this.updateHealthBar(); 
 
+            // Tüm binalar yok edildiğinde oyunu bitir
             if (this.buildingsDestroyed >= this.totalBuildings) {
-            saveScore(this.score, (isNewHighScore) => {
-                this.gameOver(isNewHighScore);
-            });
+                saveScore(this.score, (isNewHighScore) => {
+                    this.gameOver(isNewHighScore);
+                });
+            }
         }
-        }
 
-        gameOver(isNewHighScore = false) {
+        gameOver(isNewHighScore = false) {
             if (this.gameIsOver) return;
-            this.gameIsOver = true;
-            this.physics.pause();
+            this.gameIsOver = true;
+            this.physics.pause();
+            window.Telegram && window.Telegram.WebApp.HapticFeedback.notificationOccurred("success"); // Oyun bitiminde başarı titreşimi
 
             this.rockets.children.each(rocket => rocket.destroy());
             
-            const gameWidth = this.cameras.main.width;
-            const gameHeight = this.cameras.main.height;
+            const gameWidth = this.cameras.main.width;
+            const gameHeight = this.cameras.main.height;
             const centerX = gameWidth / 2;
             const centerY = gameHeight / 2;
 
-              this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0x000000, 0.7);
-            if (isNewHighScore) {
-            const logoScale = 0.5; // Birleşmiş logonun ölçeği
-            const targetX1 = centerX - (this.textures.get('logo_part_1').getSourceImage().width * logoScale) / 2;
-            const targetY1 = centerY - (this.textures.get('logo_part_1').getSourceImage().height * logoScale) / 2;
-            const targetX2 = centerX + (this.textures.get('logo_part_2').getSourceImage().width * logoScale) / 2;
-            const targetY2 = centerY - (this.textures.get('logo_part_2').getSourceImage().height * logoScale) / 2;
-            const targetX3 = centerX - (this.textures.get('logo_part_3').getSourceImage().width * logoScale) / 2;
-            const targetY3 = centerY + (this.textures.get('logo_part_3').getSourceImage().height * logoScale) / 2;
-            const targetX4 = centerX + (this.textures.get('logo_part_4').getSourceImage().width * logoScale) / 2;
-            const targetY4 = centerY + (this.textures.get('logo_part_4').getSourceImage().height * logoScale) / 2;
+            this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0x000000, 0.7);
+            
+            if (isNewHighScore) {
+                const logoScale = 0.5; // Birleşmiş logonun ölçeği
 
-            const startOffset = Math.max(gameWidth, gameHeight); // Köşelerden gelmesi için yeterli uzaklık
+                // Logo parçalarını merkeze doğru hareket ettirmek için başlangıç pozisyonları
+                const startOffset = Math.max(gameWidth, gameHeight); // Köşelerden gelmesi için yeterli uzaklık
 
-            this.logoPart1.setPosition(centerX - startOffset, centerY - startOffset).setVisible(true).setScale(logoScale); // Sol Üst
-            this.logoPart2.setPosition(centerX + startOffset, centerY - startOffset).setVisible(true).setScale(logoScale); // Sağ Üst
-            this.logoPart3.setPosition(centerX - startOffset, centerY + startOffset).setVisible(true).setScale(logoScale); // Sol Alt
-            this.logoPart4.setPosition(centerX + startOffset, centerY + startOffset).setVisible(true).setScale(logoScale); // Sağ Alt
+                this.logoPart1.setPosition(centerX - startOffset, centerY - startOffset).setVisible(true).setScale(logoScale); // Sol Üst
+                this.logoPart2.setPosition(centerX + startOffset, centerY - startOffset).setVisible(true).setScale(logoScale); // Sağ Üst
+                this.logoPart3.setPosition(centerX - startOffset, centerY + startOffset).setVisible(true).setScale(logoScale); // Sol Alt
+                this.logoPart4.setPosition(centerX + startOffset, centerY + startOffset).setVisible(true).setScale(logoScale); // Sağ Alt
 
-            const tweenDuration = 1500;
-            const ease = 'Power2';
+                const tweenDuration = 1500;
+                const ease = 'Power2';
 
-            this.tweens.add({ targets: this.logoPart1, x: centerX - (this.textures.get('logo_part_1').getSourceImage().width * logoScale) / 4, y: centerY - (this.textures.get('logo_part_1').getSourceImage().height * logoScale) / 4, duration: tweenDuration, ease: ease });
-            this.tweens.add({ targets: this.logoPart2, x: centerX + (this.textures.get('logo_part_2').getSourceImage().width * logoScale) / 4, y: centerY - (this.textures.get('logo_part_2').getSourceImage().height * logoScale) / 4, duration: tweenDuration, ease: ease });
-            this.tweens.add({ targets: this.logoPart3, x: centerX - (this.textures.get('logo_part_3').getSourceImage().width * logoScale) / 4, y: centerY + (this.textures.get('logo_part_3').getSourceImage().height * logoScale) / 4, duration: tweenDuration, ease: ease });
-            this.tweens.add({
-                targets: this.logoPart4,
-                x: centerX + (this.textures.get('logo_part_4').getSourceImage().width * logoScale) / 4,
-                y: centerY + (this.textures.get('logo_part_4').getSourceImage().height * logoScale) / 4,
-                duration: tweenDuration,
-                ease: ease,
-                onComplete: () => {
-                    this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * logoScale) / 2 + 50, "YENİ YÜKSEK SKOR!\nSkor: " + this.score, { fontSize: "40px", fill: "#00FF00", align: "center" }).setOrigin(0.5);
-                    window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
-                }
-            });
-        } else {
-            this.add.text(centerX, centerY, "OYUN BİTTİ\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
-            window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
+                // Hedef pozisyonlar (birleşmiş logonun merkezini hedef alarak)
+                const fullLogoOriginalWidth = this.textures.get('full_logo').getSourceImage().width;
+                const fullLogoOriginalHeight = this.textures.get('full_logo').getSourceImage().height;
+                
+                // Her parçanın tam logodaki yerine göre merkezden ofsetini hesapla
+                // Bu kısım, logo parçalarının tam logoyu oluşturacak şekilde doğru pozisyonlara gelmesini sağlar.
+                // Bu değerler `logo.png` dosyasının parçalara ayrılma şekline ve her bir parçanın
+                // tam logo içindeki konumuna göre ayarlanmalıdır.
+                // Örnek: Eğer logo_part_1 sol üstte ise, merkezin sol üst köşesine doğru hareket etmeli.
+                // Bu değerleri logo.png'ye bakarak manuel olarak ayarlamanız gerekebilir.
+                // Şimdilik, tam logonun merkezine orantılı olarak yaklaştırıyorum.
+                const offsetFactor = 0.25; // Parçaların ne kadar yakınlaşacağını ayarlar (0.5 olursa tam merkeze gelir)
+
+                this.tweens.add({ targets: this.logoPart1, x: centerX - (fullLogoOriginalWidth * logoScale * offsetFactor), y: centerY - (fullLogoOriginalHeight * logoScale * offsetFactor), duration: tweenDuration, ease: ease });
+                this.tweens.add({ targets: this.logoPart2, x: centerX + (fullLogoOriginalWidth * logoScale * offsetFactor), y: centerY - (fullLogoOriginalHeight * logoScale * offsetFactor), duration: tweenDuration, ease: ease });
+                this.tweens.add({ targets: this.logoPart3, x: centerX - (fullLogoOriginalWidth * logoScale * offsetFactor), y: centerY + (fullLogoOriginalHeight * logoScale * offsetFactor), duration: tweenDuration, ease: ease });
+                this.tweens.add({
+                    targets: this.logoPart4,
+                    x: centerX + (fullLogoOriginalWidth * logoScale * offsetFactor),
+                    y: centerY + (fullLogoOriginalHeight * logoScale * offsetFactor),
+                    duration: tweenDuration,
+                    ease: ease,
+                    onComplete: () => {
+                        // Tüm parçalar yerine ulaştığında, tam logoyu göster ve parçaları gizle
+                        this.logoPart1.setVisible(false);
+                        this.logoPart2.setVisible(false);
+                        this.logoPart3.setVisible(false);
+                        this.logoPart4.setVisible(false);
+                        this.fullLogo.setVisible(true).setPosition(centerX, centerY).setScale(logoScale); // Tam logoyu göster
+
+                        this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * logoScale) / 2 + 50, "YENİ YÜKSEK SKOR!\nSkor: " + this.score, { fontSize: "40px", fill: "#00FF00", align: "center" }).setOrigin(0.5);
+                        window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
+                    }
+                });
+            } else {
+                this.add.text(centerX, centerY, "OYUN BİTTİ\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
+                window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
+            }
         }
-        }
-    }
+    }
 
-    function saveScore(score, callback) {
-         if (!db || !currentUser || !currentUser.id) {
+    function saveScore(score, callback) {
+           if (!db || !currentUser || !currentUser.id) {
         console.warn("Firebase veya kullanıcı bilgisi mevcut değil, skor kaydedilemiyor.");
         if (callback) callback(false);
         return;
     }
 
-        const userDocRef = db.collection('users').doc(String(currentUser.id));
+        const userDocRef = db.collection('users').doc(String(currentUser.id));
 
         // Mevcut skoru oku ve daha yüksekse güncelle
         userDocRef.get().then((doc) => {
@@ -553,7 +569,7 @@
                 currentHighScore = doc.data().score;
             }
 
-             let isNewHighScore = false;
+            let isNewHighScore = false;
             if (score > currentHighScore) {
                 isNewHighScore = true;
                 userDocRef.set({ 
@@ -562,23 +578,33 @@
                 }, { merge: true }) 
                 .then(() => {
                     console.log("Yeni yüksek skor kaydedildi:", score);
+                    if (callback) callback(isNewHighScore);
                 })
                 .catch(err => {
                     console.error("Yüksek skor kaydetme hatası:", err);
+                    if (callback) callback(false); // Hata durumunda da callback'i çağır
                 });
             } else {
                 console.log("Yeni skor, mevcut yüksek skordan daha düşük veya eşit. Kaydedilmedi.");
+                if (callback) callback(isNewHighScore);
             }
         }).catch(err => {
             console.error("Skor okuma hatası:", err);
+            // Okuma hatası durumunda bile deneme amaçlı kaydetme (yeni yüksek skor olmasa bile)
             userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` }, { merge: true })
-                .then(() => console.log("İlk skor veya hata sonrası skor kaydedildi (fallback):", score))
-                .catch(e => console.error("Skor kaydetme hatası (fallback):", e));
+                .then(() => {
+                    console.log("İlk skor veya hata sonrası skor kaydedildi (fallback):", score);
+                    if (callback) callback(true); // Hata durumunda kaydedildiği için yeni yüksek skor olduğunu varsayabiliriz
+                })
+                .catch(e => {
+                    console.error("Skor kaydetme hatası (fallback):", e);
+                    if (callback) callback(false);
+                });
         });
-    }
+    }
 
-    const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade', arcade: { gravity: { y: 0 } } }, scene: GameScene };
-    try { const game = new Phaser.Game(config); } catch (e) { document.body.innerHTML = `<h1 style="color:red;">HATA: ${e.message}</h1>`; }
+    const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade', arcade: { gravity: { y: 0 } } }, scene: GameScene };
+    try { const game = new Phaser.Game(config); } catch (e) { document.body.innerHTML = `<h1 style="color:red;">HATA: ${e.message}</h1>`; }
 </script>
 </body>
 </html>
