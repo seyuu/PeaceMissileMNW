@@ -496,7 +496,7 @@
             const centerX = gameWidth / 2;
             const centerY = gameHeight / 2;
 
-            this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0x000000, 0.3);
+            this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0x000000, 0.1);
             
             if (isNewHighScore) {
                 const logoStartScale = 0.4; // Başlangıç ölçeği (önceki 0.3'ten artırıldı)
@@ -534,16 +534,16 @@
                 // Örneğin: logo_part_1 tam logonun sol üst kısmını temsil ediyorsa,
                 // fullLogoOriginalWidth / 4 ve fullLogoOriginalHeight / 4 gibi değerler kullanılabilir.
                 // Bu örnekte, parçaların hedeflerini daha merkezi yapıyoruz ve scale ile oynayarak büyütme sağlıyoruz.
-                const offsetFactorX = 0.15; // Yatayda merkeze yaklaşma oranı
-                const offsetFactorY = 0.15; // Dikeyde merkeze yaklaşma oranı
+                const offsetFactorX =fullLogoOriginalWidth * logoTargetScale * 0.15; // Yatayda merkeze yaklaşma oranı
+                const offsetFactorY = fullLogoOriginalHeight * logoTargetScale * 0.15; // Dikeyde merkeze yaklaşma oranı
 
-                this.tweens.add({ targets: this.logoPart1, x: centerX - (fullLogoOriginalWidth * logoTargetScale * offsetFactorX), y: centerY - (fullLogoOriginalHeight * logoTargetScale * offsetFactorY), scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
-                this.tweens.add({ targets: this.logoPart2, x: centerX + (fullLogoOriginalWidth * logoTargetScale * offsetFactorX), y: centerY - (fullLogoOriginalHeight * logoTargetScale * offsetFactorY), scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
-                this.tweens.add({ targets: this.logoPart3, x: centerX - (fullLogoOriginalWidth * logoTargetScale * offsetFactorX), y: centerY + (fullLogoOriginalHeight * logoTargetScale * offsetFactorY), scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
+                this.tweens.add({ targets: this.logoPart1, x: centerX -  offsetFactorX, y: centerY -  offsetFactorY, scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
+                this.tweens.add({ targets: this.logoPart2, x: centerX + offsetFactorX, y: centerY -  offsetFactorY, scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
+                this.tweens.add({ targets: this.logoPart3, x: centerX - offsetFactorX, y: centerY +  offsetFactorY, scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
                 this.tweens.add({
                     targets: this.logoPart4,
-                    x: centerX + (fullLogoOriginalWidth * logoTargetScale * offsetFactorX),
-                    y: centerY + (fullLogoOriginalHeight * logoTargetScale * offsetFactorY),
+                    x: centerX +  offsetFactorX,
+                    y: centerY + offsetFactorY,
                     scale: logoTargetScale, // Scale animasyona eklendi
                     duration: tweenDuration,
                     ease: ease,
