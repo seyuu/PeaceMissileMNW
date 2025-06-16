@@ -40,13 +40,15 @@
         constructor() {
             super({ key: 'GameScene' });
             this.score = 0;
-            this.initialHealth = 3; // Başlangıç sağlık değeri, artık genel değil
             this.gameIsOver = false;
-            this.gameTime = 0; // Oyun süresini takip etmek için
-            this.maxBuildingHealth = 3; // Her binanın başlangıç dayanıklılığı
-            this.buildingsDestroyed = 0; // Yıkılan bina sayısı
-            this.totalBuildings = 0; // Toplam bina sayısı
-            this.healthBar = null; // Sağlık çubuğu için
+            this.gameTime = 0;
+            this.maxBuildingHealth = 3; 
+            this.buildingsDestroyed = 0;
+            this.totalBuildings = 0;
+            this.healthBar = null; 
+
+            this.referenceWidth = 1080; // Görselin referans genişliği
+            this.referenceHeight = 1920; // Görselin referans yüksekliği
         }
 
         preload() {
@@ -57,65 +59,88 @@
             this.load.image('background', bgUrl);
             this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
             this.load.image('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif');
-            // VARSAYIMSAL YIKIK BİNA GÖRSELİ - BURAYI KENDİ GÖRSEL URL'NİZLE DEĞİŞTİRİN
-            this.load.image('destroyed_building', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/crater.png'); // Örnek olarak bir krater görseli kullandım
-            // Eğer "intact" (sağlam) bina görselleriniz varsa, onları da burada yüklemelisiniz
-            // Örneğin: this.load.image('israel_building_1', 'path/to/israel_building_1.png');
-            // Şu anda binalar görünmez çarpışma kutuları ve arka plan resmi üzerindeki yerlerini temsil ediyor.
-            // Bu nedenle, hasar efekti için sadece alpha (opaklık) ve sonra 'destroyed_building' kullanacağız.
+            this.load.image('destroyed_building', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/destroyed_building.png'); 
         }
 
         create() {
             const gameWidth = this.cameras.main.width;
             const gameHeight = this.cameras.main.height;
 
+            // Arka planı ekran boyutuna göre ayarla
             let bg = this.add.image(gameWidth / 2, gameHeight / 2, 'background');
             bg.setDisplaySize(gameWidth, gameHeight);
 
             this.buildings = this.physics.add.staticGroup();
-            this.buildingSprites = this.add.group(); // Bina görsellerini tutacak grup
+            this.destroyedBuildingSprites = this.add.group(); // Yıkık bina görsellerini tutacak grup
             
             const buildingsData = [];
 
+            // Bina koordinatları ve boyutları (referans çözünürlüğe göre oranlı)
             if (this.selectedSide === 'israel') {
-                buildingsData.push({ x: gameWidth * 0.25, y: gameHeight, width: gameWidth * 0.4, height: 180, visualOffsetX: 0, visualOffsetY: -90 });
-                buildingsData.push({ x: gameWidth * 0.6, y: gameHeight, width: gameWidth * 0.3, height: 280, visualOffsetX: 0, visualOffsetY: -140 });
-                buildingsData.push({ x: gameWidth * 0.85, y: gameHeight, width: gameWidth * 0.2, height: 220, visualOffsetX: 0, visualOffsetY: -110 });
+                // İsrail (Tel Aviv sahili) için güncellenmiş koordinatlar
+                // X, Y koordinatları ve Genişlik, Yükseklik (referans piksel değerleri)
+                // visualOffsetY: Kraterin konumunu dikeyde ayarlamak için.
+                // Oranları mevcut ekran boyutuna uyarlayarak gerçek piksel değerlerini elde ediyoruz.
+                buildingsData.push({ 
+                    x: (550 / this.referenceWidth) * gameWidth, 
+                    y: gameHeight, // Tabana hizalı
+                    width: (400 / this.referenceWidth) * gameWidth, 
+                    height: (620 / this.referenceHeight) * gameHeight, 
+                    visualOffsetY: -((620 / this.referenceHeight) * gameHeight * 0.5) // Kraterin ortası binanın ortasına denk gelsin
+                });
+                buildingsData.push({ 
+                    x: (750 / this.referenceWidth) * gameWidth, 
+                    y: gameHeight, 
+                    width: (300 / this.referenceWidth) * gameWidth, 
+                    height: (520 / this.referenceHeight) * gameHeight,
+                    visualOffsetY: -((520 / this.referenceHeight) * gameHeight * 0.5)
+                });
+                buildingsData.push({ 
+                    x: (950 / this.referenceWidth) * gameWidth, 
+                    y: gameHeight, 
+                    width: (200 / this.referenceWidth) * gameWidth, 
+                    height: (420 / this.referenceHeight) * gameHeight,
+                    visualOffsetY: -((420 / this.referenceHeight) * gameHeight * 0.5)
+                });
             } else { // iran
-                buildingsData.push({ x: gameWidth * 0.3, y: gameHeight, width: gameWidth * 0.5, height: 200, visualOffsetX: 0, visualOffsetY: -100 });
-                buildingsData.push({ x: gameWidth * 0.8, y: gameHeight, width: gameWidth * 0.3, height: 170, visualOffsetX: 0, visualOffsetY: -85 });
+                // İran (İsfahan Meydanı) için güncellenmiş koordinatlar
+                buildingsData.push({ 
+                    x: (325 / this.referenceWidth) * gameWidth, 
+                    y: gameHeight, 
+                    width: (550 / this.referenceWidth) * gameWidth, 
+                    height: (620 / this.referenceHeight) * gameHeight,
+                    visualOffsetY: -((620 / this.referenceHeight) * gameHeight * 0.5)
+                });
+                buildingsData.push({ 
+                    x: (825 / this.referenceWidth) * gameWidth, 
+                    y: gameHeight, 
+                    width: (350 / this.referenceWidth) * gameWidth, 
+                    height: (520 / this.referenceHeight) * gameHeight,
+                    visualOffsetY: -((520 / this.referenceHeight) * gameHeight * 0.5)
+                });
             }
 
             this.totalBuildings = buildingsData.length;
 
-            buildingsData.forEach((data, index) => {
+            buildingsData.forEach((data) => {
                 const buildingBody = this.buildings.create(data.x, data.y, null)
                     .setSize(data.width, data.height)
-                    .setOrigin(0.5, 1)
-                    .setVisible(false) // Çarpışma kutusu görünmez kalır
+                    .setOrigin(0.5, 1) // Alt ortaya hizala
+                    .setVisible(false) // Fiziksel kutu görünmez kalır
                     .refreshBody();
                 
-                buildingBody.buildingHealth = this.maxBuildingHealth; // Binanın kendi sağlığı
-                buildingBody.totalHealth = this.maxBuildingHealth; // Toplam sağlık, alpha hesaplaması için
-                buildingBody.initialX = data.x;
-                buildingBody.initialY = data.y;
-
-                // Bina görselini oluştur (arka plan üzerindeki binanın yerini temsil ediyor)
-                // Burada gerçek bina görselleriniz olsaydı, onları yüklersiniz.
-                // Örneğin: this.add.image(data.x, data.y + data.visualOffsetY, `israel_building_${index+1}`);
-                // Şimdilik, sadece arka plan üzerindeki alanı temsil eden bir görselimiz yok,
-                // bu yüzden hasarı opaklık ile göstereceğiz.
-                // Eğer arka plan resimlerindeki binaların üzerine oturan ayrı görselleriniz olsaydı,
-                // onları burada oluşturup 'buildingBody.sprite' olarak atardık.
-                // Şimdilik, bu görsel temsil için buildingBody'nin kendisini kullanacağız.
-                // Yıkıldığında 'destroyed_building' görseli eklenecek.
+                buildingBody.buildingHealth = this.maxBuildingHealth;
+                buildingBody.totalHealth = this.maxBuildingHealth; 
+                buildingBody.visualX = data.x; // Kraterin yerleşeceği X
+                // Kraterin binanın üst kısmına değil, genel ortasına veya biraz altına yerleşmesi için ayarlandı
+                buildingBody.visualY = data.y + data.visualOffsetY; 
+                buildingBody.visualWidth = data.width; // Kraterin ölçekleneceği referans genişlik
+                buildingBody.visualHeight = data.height; // Kraterin ölçekleneceği referans yükseklik
             });
 
-
             this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
-            // Genel sağlık çubuğu (tüm binaların toplam sağlığı)
             this.healthBar = this.add.graphics();
-            this.updateHealthBar(); // İlk sağlık çubuğunu çiz
+            this.updateHealthBar(); 
 
             this.rockets = this.physics.add.group();
             this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this);
@@ -139,24 +164,20 @@
             const totalMaxHealth = this.totalBuildings * this.maxBuildingHealth;
             const healthRatio = totalCurrentHealth / totalMaxHealth;
 
-            // Arka plan çubuğu
-            this.healthBar.fillStyle(0x000000, 0.7); // Siyah, yarı saydam
+            this.healthBar.fillStyle(0x000000, 0.7); 
             this.healthBar.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
 
-            // Sağlık çubuğu
-            this.healthBar.fillStyle(0x00FF00); // Yeşil
+            this.healthBar.fillStyle(0x00FF00); 
             if (healthRatio < 0.5) {
-                this.healthBar.fillStyle(0xFFFF00); // Sarı
+                this.healthBar.fillStyle(0xFFFF00); 
             }
             if (healthRatio < 0.25) {
-                this.healthBar.fillStyle(0xFF0000); // Kırmızı
+                this.healthBar.fillStyle(0xFF0000); 
             }
             this.healthBar.fillRect(healthBarX, healthBarY, healthBarWidth * healthRatio, healthBarHeight);
 
-            this.healthBar.lineStyle(2, 0xFFFFFF); // Beyaz çerçeve
+            this.healthBar.lineStyle(2, 0xFFFFFF); 
             this.healthBar.strokeRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
-
-            // Metin yerine görsel bir çubuk kullanıyoruz
         }
 
         increaseGameTime() {
@@ -170,39 +191,53 @@
             const gameHeight = this.cameras.main.height;
 
             let startX, startY, velocityX, velocityY, angle;
-            let spawnType = Phaser.Math.Between(0, 100);
+            let spawnType = Phaser.Math.Between(0, 100); 
 
             let baseSpeed = 150 + (this.gameTime * 2);
             let maxSpeed = 400 + (this.gameTime * 5);
             if (baseSpeed > 600) baseSpeed = 600;
             if (maxSpeed > 800) maxSpeed = 800;
 
-            let buildingDamageBonus = this.buildingsDestroyed * 50;
+            let buildingDamageBonus = this.buildingsDestroyed * 50; 
             baseSpeed += buildingDamageBonus;
             maxSpeed += buildingDamageBonus;
 
-            // Roketler hedefe doğru gitsin diye genel bir hedef belirleyelim (bina alanının ortası)
-            const targetX = gameWidth / 2;
-            const targetY = gameHeight * 0.8; // Binaların olduğu bölge
+            // Rastgele bir hedef bina seçelim (yıkılmamış olanlardan)
+            const activeBuildings = this.buildings.children.entries.filter(b => b.body.enable);
+            let targetBuilding = null;
+            if (activeBuildings.length > 0) {
+                targetBuilding = Phaser.Utils.Array.GetRandom(activeBuildings);
+            }
+            
+            let targetX, targetY;
+            if (targetBuilding) {
+                // Hedef bina varsa, o binanın çarpışma kutusunun üst kısmına doğru git
+                targetX = targetBuilding.x + Phaser.Math.Between(-targetBuilding.body.width / 4, targetBuilding.body.width / 4);
+                targetY = targetBuilding.y - targetBuilding.body.height + Phaser.Math.Between(0, targetBuilding.body.height / 2); // Binanın üst yarısı
+            } else {
+                // Hedef bina kalmadıysa, ekranın alt ortasını hedefle
+                targetX = gameWidth / 2;
+                targetY = gameHeight * 0.8;
+            }
+
 
             if (this.gameTime < 10 || spawnType < 70) {
                 // Yukarıdan aşağıya inen roket
                 startX = Phaser.Math.Between(40, gameWidth - 40);
                 startY = -100;
                 
-                // Hedefe doğru yönlü hız hesapla
                 const angleToTarget = Phaser.Math.Angle.Between(startX, startY, targetX, targetY);
                 const speed = Phaser.Math.Between(baseSpeed, maxSpeed);
                 velocityX = Math.cos(angleToTarget) * speed;
                 velocityY = Math.sin(angleToTarget) * speed;
-                angle = Phaser.Math.RadToDeg(angleToTarget) + 90; // Roket görselini doğru yöne çevir
+                angle = Phaser.Math.RadToDeg(angleToTarget) + 90; 
             } else {
                 // Yanlardan, kavisli gelen roketler
                 let side = Phaser.Math.Between(0, 1) === 0 ? 'left' : 'right';
 
                 if (side === 'left') {
                     startX = -100;
-                    startY = Phaser.Math.Between(gameHeight * 0.3, gameHeight * 0.7); // Orta yüksekliklerden
+                    startY = Phaser.Math.Between(gameHeight * 0.3, gameHeight * 0.7); 
                     
                     const angleToTarget = Phaser.Math.Angle.Between(startX, startY, targetX, targetY);
                     const speed = Phaser.Math.Between(baseSpeed, maxSpeed);
@@ -250,46 +285,37 @@
         hitBuilding(rocket, building) {
             if (!rocket.active || !building.body.enable || this.gameIsOver) return;
 
-            building.buildingHealth--; // Binanın sağlığını azalt
+            building.buildingHealth--; 
             
             window.Telegram && window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");
 
-            // Patlama efekti
             const explosion = this.add.image(rocket.x, rocket.y + 20, "explosion").setScale(1.2).setTint(0xFF0000);
             this.time.delayedCall(300, () => explosion.destroy());
             this.cameras.main.shake(200, 0.02);
 
-            rocket.destroy(); // Roketi imha et
+            rocket.destroy(); 
 
-            // Bina hasarını görselleştir (opaklık ve yıkık efekti)
-            const healthRatio = building.buildingHealth / building.totalHealth;
-
-            // Eğer bir bina görseliniz olsaydı, onun opaklığını ayarlardınız:
-            // if (building.sprite) {
-            //     building.sprite.setAlpha(0.2 + 0.8 * healthRatio); // 0.2'den 1'e kadar değişsin
-            // }
-
-            // Şimdilik bina görselimiz olmadığı için, sadece yıkım efektini yönetiyoruz.
             if (building.buildingHealth <= 0) {
-                // Bina tamamen yıkıldı!
                 this.buildingsDestroyed++;
-                building.body.enable = false; // Çarpışmayı durdur
-                building.setVisible(false); // Fiziksel kutuyu gizle
+                building.body.enable = false; 
+                building.setVisible(false); 
 
-                // Yıkık bina görselini ekle
-                const destroyedSprite = this.add.image(building.initialX, building.initialY - (building.body.height / 2), 'destroyed_building');
-                // destroyedSprite.setOrigin(0.5, 0.5); // Görselin orijinini ayarlayın
-                destroyedSprite.setScale(building.body.width / destroyedSprite.width * 0.8, building.body.height / destroyedSprite.height * 0.8); // Binanın boyutuna göre ölçekle (yaklaşık)
-                this.buildingSprites.add(destroyedSprite); // Yeni görseli gruba ekle
+                // Yıkık bina görselini ekle (krater)
+                const destroyedSprite = this.add.image(building.visualX, building.visualY, 'destroyed_building');
+                destroyedSprite.setOrigin(0.5, 0.5); // Kraterin merkezi konumlandırma için
+                
+                // Krateri binanın fiziksel kutusuna göre ölçekle
+                // Örnek: Kraterin genişliğini binanın genişliğinin %70'i kadar yap
+                const scaleFactor = Math.min(building.visualWidth / destroyedSprite.width, building.visualHeight / destroyedSprite.height) * 0.7;
+                destroyedSprite.setScale(scaleFactor); 
+                this.destroyedBuildingSprites.add(destroyedSprite);
 
-                // Büyük bir patlama efekti
-                const finalExplosion = this.add.image(building.initialX, building.initialY - (building.body.height / 2), "explosion").setScale(2).setTint(0x800000);
+                const finalExplosion = this.add.image(building.visualX, building.visualY, "explosion").setScale(2).setTint(0x800000);
                 this.time.delayedCall(500, () => finalExplosion.destroy());
             }
 
-            this.updateHealthBar(); // Sağlık çubuğunu güncelle
+            this.updateHealthBar(); 
 
-            // Tüm binalar yıkıldı mı kontrol et
             if (this.buildingsDestroyed >= this.totalBuildings) {
                 this.gameOver();
             }
