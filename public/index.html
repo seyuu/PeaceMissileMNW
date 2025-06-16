@@ -542,12 +542,12 @@
                         this.logoPart4.setVisible(false);
                         this.fullLogo.setVisible(true).setPosition(centerX, centerY).setScale(logoScale); // Tam logoyu göster
 
-                        this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * logoScale) / 2 + 50, "YENİ YÜKSEK SKOR!\nSkor: " + this.score, { fontSize: "40px", fill: "#00FF00", align: "center" }).setOrigin(0.5);
+                        this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * logoScale) / 2 + 50, "NEW SCORE!\n " + this.score, { fontSize: "40px", fill: "#00FF00", align: "center" }).setOrigin(0.5);
                         window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
                     }
                 });
             } else {
-                this.add.text(centerX, centerY, "OYUN BİTTİ\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
+                this.add.text(centerX, centerY, "GAME OVER\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
                 window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
             }
         }
@@ -577,7 +577,7 @@
                     username: currentUser.username || currentUser.first_name || `User${currentUser.id}` 
                 }, { merge: true }) 
                 .then(() => {
-                    console.log("Yeni yüksek skor kaydedildi:", score);
+                    console.log("New Score:", score);
                     if (callback) callback(isNewHighScore);
                 })
                 .catch(err => {
