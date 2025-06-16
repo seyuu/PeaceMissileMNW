@@ -496,42 +496,55 @@
             const centerX = gameWidth / 2;
             const centerY = gameHeight / 2;
 
-            this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0x000000, 0.7);
+            this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0x000000, 0.3);
             
             if (isNewHighScore) {
-                const logoScale = 0.5; // Birleşmiş logonun ölçeği
+                const logoStartScale = 0.4; // Başlangıç ölçeği (önceki 0.3'ten artırıldı)
+                const logoTargetScale = 0.8; // Hedef ölçeği (önceki 0.6'dan artırıldı)
+                const fullLogoScale = 0.9; // Tam logo ölçeği (önceki 0.7'den artırıldı)
+
+                 // Logo parçalarını daha yavaş birleştirmek için tween süresini artırdık (1500'den 2500'e)
+                const tweenDuration = 2500; // Burası değiştirildi: 1500 -> 2500
+                const ease = 'Power2';
+
+                // "YENİ YÜKSEK SKOR!" yazısının rengini ve font boyutunu değiştirdik
+                const newHighScoreTextStyle = {
+                    fontSize: "36px", // Önceki "40px"ten "36px"e düşürüldü (daha küçük)
+                    fill: "#FFD700", // Altın rengi (daha parlak ve dikkat çekici)
+                    align: "center",
+                    stroke: '#000', // Kontur ekleyelim, daha belirgin olur
+                    strokeThickness: 6
+                };
 
                 // Logo parçalarını merkeze doğru hareket ettirmek için başlangıç pozisyonları
-                const startOffset = Math.max(gameWidth, gameHeight); // Köşelerden gelmesi için yeterli uzaklık
+               const startOffset = Math.max(gameWidth, gameHeight); // Köşelerden gelmesi için yeterli uzaklık
 
-                this.logoPart1.setPosition(centerX - startOffset, centerY - startOffset).setVisible(true).setScale(logoScale); // Sol Üst
-                this.logoPart2.setPosition(centerX + startOffset, centerY - startOffset).setVisible(true).setScale(logoScale); // Sağ Üst
-                this.logoPart3.setPosition(centerX - startOffset, centerY + startOffset).setVisible(true).setScale(logoScale); // Sol Alt
-                this.logoPart4.setPosition(centerX + startOffset, centerY + startOffset).setVisible(true).setScale(logoScale); // Sağ Alt
-
-                const tweenDuration = 1500;
-                const ease = 'Power2';
+                this.logoPart1.setPosition(centerX - startOffset, centerY - startOffset).setVisible(true).setScale(logoStartScale);
+                this.logoPart2.setPosition(centerX + startOffset, centerY - startOffset).setVisible(true).setScale(logoStartScale);
+                this.logoPart3.setPosition(centerX - startOffset, centerY + startOffset).setVisible(true).setScale(logoStartScale);
+                this.logoPart4.setPosition(centerX + startOffset, centerY + startOffset).setVisible(true).setScale(logoStartScale);
 
                 // Hedef pozisyonlar (birleşmiş logonun merkezini hedef alarak)
                 const fullLogoOriginalWidth = this.textures.get('full_logo').getSourceImage().width;
                 const fullLogoOriginalHeight = this.textures.get('full_logo').getSourceImage().height;
                 
-                // Her parçanın tam logodaki yerine göre merkezden ofsetini hesapla
-                // Bu kısım, logo parçalarının tam logoyu oluşturacak şekilde doğru pozisyonlara gelmesini sağlar.
-                // Bu değerler `logo.png` dosyasının parçalara ayrılma şekline ve her bir parçanın
-                // tam logo içindeki konumuna göre ayarlanmalıdır.
-                // Örnek: Eğer logo_part_1 sol üstte ise, merkezin sol üst köşesine doğru hareket etmeli.
+                
+                // Her parçanın tam logodaki yerine göre merkezden orantılı ofsetini hesapla
                 // Bu değerleri logo.png'ye bakarak manuel olarak ayarlamanız gerekebilir.
-                // Şimdilik, tam logonun merkezine orantılı olarak yaklaştırıyorum.
-                const offsetFactor = 0.25; // Parçaların ne kadar yakınlaşacağını ayarlar (0.5 olursa tam merkeze gelir)
+                // Örneğin: logo_part_1 tam logonun sol üst kısmını temsil ediyorsa,
+                // fullLogoOriginalWidth / 4 ve fullLogoOriginalHeight / 4 gibi değerler kullanılabilir.
+                // Bu örnekte, parçaların hedeflerini daha merkezi yapıyoruz ve scale ile oynayarak büyütme sağlıyoruz.
+                const offsetFactorX = 0.15; // Yatayda merkeze yaklaşma oranı
+                const offsetFactorY = 0.15; // Dikeyde merkeze yaklaşma oranı
 
-                this.tweens.add({ targets: this.logoPart1, x: centerX - (fullLogoOriginalWidth * logoScale * offsetFactor), y: centerY - (fullLogoOriginalHeight * logoScale * offsetFactor), duration: tweenDuration, ease: ease });
-                this.tweens.add({ targets: this.logoPart2, x: centerX + (fullLogoOriginalWidth * logoScale * offsetFactor), y: centerY - (fullLogoOriginalHeight * logoScale * offsetFactor), duration: tweenDuration, ease: ease });
-                this.tweens.add({ targets: this.logoPart3, x: centerX - (fullLogoOriginalWidth * logoScale * offsetFactor), y: centerY + (fullLogoOriginalHeight * logoScale * offsetFactor), duration: tweenDuration, ease: ease });
+                this.tweens.add({ targets: this.logoPart1, x: centerX - (fullLogoOriginalWidth * logoTargetScale * offsetFactorX), y: centerY - (fullLogoOriginalHeight * logoTargetScale * offsetFactorY), scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
+                this.tweens.add({ targets: this.logoPart2, x: centerX + (fullLogoOriginalWidth * logoTargetScale * offsetFactorX), y: centerY - (fullLogoOriginalHeight * logoTargetScale * offsetFactorY), scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
+                this.tweens.add({ targets: this.logoPart3, x: centerX - (fullLogoOriginalWidth * logoTargetScale * offsetFactorX), y: centerY + (fullLogoOriginalHeight * logoTargetScale * offsetFactorY), scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
                 this.tweens.add({
                     targets: this.logoPart4,
-                    x: centerX + (fullLogoOriginalWidth * logoScale * offsetFactor),
-                    y: centerY + (fullLogoOriginalHeight * logoScale * offsetFactor),
+                    x: centerX + (fullLogoOriginalWidth * logoTargetScale * offsetFactorX),
+                    y: centerY + (fullLogoOriginalHeight * logoTargetScale * offsetFactorY),
+                    scale: logoTargetScale, // Scale animasyona eklendi
                     duration: tweenDuration,
                     ease: ease,
                     onComplete: () => {
@@ -540,16 +553,19 @@
                         this.logoPart2.setVisible(false);
                         this.logoPart3.setVisible(false);
                         this.logoPart4.setVisible(false);
-                        this.fullLogo.setVisible(true).setPosition(centerX, centerY).setScale(logoScale); // Tam logoyu göster
+                        this.fullLogo.setVisible(true).setPosition(centerX, centerY).setScale(fullLogoScale); // Tam logoyu göster
 
-                        this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * logoScale) / 2 + 50, "NEW SCORE!\n " + this.score, { fontSize: "40px", fill: "#00FF00", align: "center" }).setOrigin(0.5);
-                        window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
+                        this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * fullLogoScale) / 2 + 50, "New Score!\n: " + this.score, newHighScoreTextStyle).setOrigin(0.5); // Yeni stil kullanıldı
+                        
+                        // Kapanma süresini 5 saniye daha uzattık (4000 + 5000 = 9000 ms)
+                        window.Telegram && window.Telegram.WebApp && this.time.delayedCall(9000, () => window.Telegram.WebApp.close()); // Burası değiştirildi: 4000 -> 9000
                     }
                 });
             } else {
-                this.add.text(centerX, centerY, "GAME OVER\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
-                window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
-            }
+                this.add.text(centerX, centerY, "Game Over\n: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
+                // Kapanma süresini 5 saniye daha uzattık (4000 + 5000 = 9000 ms)
+                window.Telegram && window.Telegram.WebApp && this.time.delayedCall(9000, () => window.Telegram.WebApp.close()); // Burası değiştirildi: 4000 -> 9000
+              }
         }
     }
 
