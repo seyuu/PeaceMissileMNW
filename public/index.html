@@ -18,14 +18,14 @@
 function runGame() {
     try {
         // --- 1. FIREBASE KURULUMU ---
-         const firebaseConfig = {
-            apiKey: "AIzaSyBtOkm8dpjVXlzAXCEB5sL_Awqq4HEeemc",
+        const firebaseConfig = {
+            apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
             authDomain: "peacemissile-game.firebaseapp.com",
             projectId: "peacemissile-game",
             storageBucket: "peacemissile-game.firebasestorage.app",
             messagingSenderId: "641906716058",
             appId: "1:641906716058:web:1376e93994fab29f049e23"
-            };
+        };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
@@ -42,9 +42,13 @@ function runGame() {
                 this.selectedSide = urlParams.get('side') || 'israel';
                 this.load.image('background', `https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/${this.selectedSide}_bg.jpg`);
                 this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
-                this.load.image('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif');
+                // .gif dosyasını da yükleyelim
+                this.load.spritesheet('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif', { frameWidth: 64, frameHeight: 64 });
             }
             create() {
+                // Patlama animasyonunu oluştur
+                this.anims.create({ key: 'explode_anim', frames: this.anims.generateFrameNumbers('explosion'), frameRate: 20, repeat: 0, hideOnComplete: true });
+
                 this.health = 3; this.isGameOver = false; sessionScore = 0;
                 let bg = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, 'background');
                 bg.setDisplaySize(this.cameras.main.width, this.cameras.main.height);
@@ -54,7 +58,15 @@ function runGame() {
                 this.time.addEvent({ delay: 1300, callback: this.spawnRocket, callbackScope: this, loop: true });
             }
             spawnRocket(){if(this.isGameOver)return;const e=Phaser.Math.Between(40,this.cameras.main.width-40),t=this.rockets.create(e,-100,"rocket");t.setAngle(180),t.setVelocityY(Phaser.Math.Between(300,500)),t.setInteractive({useHandCursor:!0}),t.on("pointerdown",()=>this.destroyRocket(t))}
-            destroyRocket(e){if(!e.active)return;sessionScore+=10,this.scoreText.setText("Score: "+sessionScore);const t=this.add.image(e.x,e.y,"explosion").setScale(.5);this.time.delayedCall(150,()=>t.destroy()),e.destroy()}
+            destroyRocket(e){
+                if(!e.active)return;
+                sessionScore+=10;
+                this.scoreText.setText("Score: "+sessionScore);
+                // Patlama animasyonunu oynat
+                let explosionSprite = this.add.sprite(e.x, e.y, 'explosion');
+                explosionSprite.play('explode_anim');
+                e.destroy();
+            }
             update() {
                 if (this.isGameOver) return;
                 this.rockets.children.each(rocket => {
@@ -70,19 +82,15 @@ function runGame() {
                 this.isGameOver = true; this.physics.pause();
                 this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'GAME OVER\nScore: ' + sessionScore, { fontSize: '48px', fill: '#ff0000', align: 'center' }).setOrigin(0.5);
                 
-                // FIREBASE SKOR KAYDETME
                 if (currentUser && sessionScore > 0) {
                     const userDocRef = db.collection('users').doc(String(currentUser.id));
                     userDocRef.update({
                         score: firebase.firestore.FieldValue.increment(sessionScore),
-                        username: currentUser.username || currentUser.first_name // Kullanıcı adını da güncelleyelim
+                        username: currentUser.username || currentUser.first_name
                     }).catch(err => {
-                        // Eğer kullanıcı ilk kez oynuyorsa ve kayıt yoksa, update hata verir. O zaman set kullan.
                         if (err.code === 'not-found') {
                             userDocRef.set({ score: sessionScore, username: currentUser.username || currentUser.first_name });
-                        } else {
-                            console.error("Firebase Error:", err);
-                        }
+                        } else { console.error("Firebase Error:", err); }
                     });
                 }
                 setTimeout(() => tg.close(), 4000);
@@ -95,13 +103,12 @@ function runGame() {
     } catch(e) {
         document.body.innerHTML = `<h1 style="color:red;">Error: ${e.message}</h1>`;
     }
-}
+} // <-- EKSİK OLAN LANET PARANTEZ BURADA
 
 // --- BAŞLATICI ---
 if (window.Telegram && window.Telegram.WebApp) {
     window.Telegram.WebApp.ready(runGame);
 } else {
-    // Tarayıcıda test için
     window.addEventListener('load', runGame);
 }
 </script>
