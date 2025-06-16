@@ -60,6 +60,8 @@
             this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
             this.load.image('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif');
             this.load.image('destroyed_building', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/destroyed_building.png'); 
+            // Yeni güvercin görseli
+            this.load.image('dove', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/dove.png'); // Bu URL'yi kendi güvercin görselinizle değiştirin
         }
 
         create() {
@@ -81,9 +83,9 @@
             if (this.selectedSide === 'israel') {
                 buildingsData.push({ 
                     x: (550 / this.referenceWidth) * gameWidth, 
-                    yOffsetFromBottom: 450, // Binanın tabanından kaç piksel yukarıda başlıyor (referans resimde)
+                    yOffsetFromBottom: 450, 
                     width: (400 / this.referenceWidth) * gameWidth, 
-                    height: 300 // Çarpışma kutusu yüksekliği (referans resimde)
+                    height: 300 
                 });
                 buildingsData.push({ 
                     x: (750 / this.referenceWidth) * gameWidth, 
@@ -135,7 +137,7 @@
 
             this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
             this.healthBar = this.add.graphics();
-            this.updateHealthBar(); 
+            this.updateHealthBar(); // İlk sağlık çubuğunu çiz
 
             this.rockets = this.physics.add.group();
             this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this);
@@ -147,10 +149,12 @@
         updateHealthBar() {
             this.healthBar.clear();
             const gameWidth = this.cameras.main.width;
+            const scoreTextBounds = this.scoreText.getBounds(); // Skor metninin boyutlarını al
+
             const healthBarWidth = 200;
             const healthBarHeight = 30;
-            const healthBarX = gameWidth - healthBarWidth - 16;
-            const healthBarY = 16;
+            const healthBarX = 16; // Skor metniyle aynı X
+            const healthBarY = scoreTextBounds.bottom + 10; // Skor metninin altından 10 piksel aşağıda
 
             let totalCurrentHealth = 0;
             this.buildings.children.each(b => {
@@ -197,7 +201,6 @@
             baseSpeed += buildingDamageBonus;
             maxSpeed += buildingDamageBonus;
 
-            // Yıkılmamış aktif binalardan rastgele birini hedefle
             const activeBuildings = this.buildings.children.entries.filter(b => b.body.enable);
             let targetBuilding = null;
             if (activeBuildings.length > 0) {
@@ -206,19 +209,15 @@
             
             let targetX, targetY;
             if (targetBuilding) {
-                // Roket, binanın çarpışma kutusunun üst yarısına veya çatısına doğru yönelsin
-                // targetBuilding.y = çarpışma kutusunun üst kenarının Y koordinatı
                 targetX = targetBuilding.x + Phaser.Math.Between(-targetBuilding.body.width / 4, targetBuilding.body.width / 4);
-                targetY = targetBuilding.y + Phaser.Math.Between(0, targetBuilding.body.height / 3); // Binanın en üst 1/3'lük kısmını hedefle
+                targetY = targetBuilding.y + Phaser.Math.Between(0, targetBuilding.body.height / 3); 
             } else {
-                // Hedef bina kalmadıysa, ekranın alt ortasını hedefle
                 targetX = gameWidth / 2;
                 targetY = gameHeight * 0.8;
             }
 
 
             if (this.gameTime < 10 || spawnType < 70) {
-                // Yukarıdan aşağıya inen roket
                 startX = Phaser.Math.Between(40, gameWidth - 40);
                 startY = -100;
                 
@@ -228,7 +227,6 @@
                 velocityY = Math.sin(angleToTarget) * speed;
                 angle = Phaser.Math.RadToDeg(angleToTarget) + 90; 
             } else {
-                // Yanlardan, kavisli gelen roketler
                 let side = Phaser.Math.Between(0, 1) === 0 ? 'left' : 'right';
 
                 if (side === 'left') {
@@ -240,7 +238,7 @@
                     velocityX = Math.cos(angleToTarget) * speed;
                     velocityY = Math.sin(angleToTarget) * speed;
                     angle = Phaser.Math.RadToDeg(angleToTarget) + 90;
-                } else { // 'right'
+                } else { 
                     startX = gameWidth + 100;
                     startY = Phaser.Math.Between(gameHeight * 0.3, gameHeight * 0.7);
                     
@@ -273,8 +271,23 @@
             this.score += 10;
             this.scoreText.setText("Score: " + this.score);
 
+            // Patlama efekti
             const explosion = this.add.image(rocket.x, rocket.y, "explosion").setScale(0.5);
             this.time.delayedCall(150, () => explosion.destroy());
+
+            // Güvercin efekti
+            const dove = this.add.image(rocket.x, rocket.y, 'dove').setScale(0.1); // Güvercin boyutu ayarlanabilir
+            this.tweens.add({
+                targets: dove,
+                y: dove.y - 100, // Yukarı doğru uçuş efekti
+                alpha: 0, // Yavaşça kaybolma
+                duration: 1000,
+                ease: 'Power1',
+                onComplete: () => {
+                    dove.destroy();
+                }
+            });
+
             rocket.destroy();
         }
 
@@ -299,8 +312,12 @@
                 const destroyedSprite = this.add.image(building.visualX, building.visualY, 'destroyed_building');
                 destroyedSprite.setOrigin(0.5, 0.5); 
                 
-                const scaleFactor = Math.min(building.visualWidth / destroyedSprite.width, building.visualHeight / destroyedSprite.height) * 0.7; 
-                destroyedSprite.setScale(scaleFactor); 
+                // Krateri binanın fiziksel kutusuna göre ölçekle ve %100 daha büyük yap (2 katı)
+                // building.visualWidth ve building.visualHeight, çarpışma kutusunun oranlanmış boyutlarıdır.
+                // destroyedSprite.width ve destroyedSprite.height, yüklenen destroyed_building.png'nin orijinal piksel boyutlarıdır.
+                const originalScaleFactor = Math.min(building.visualWidth / destroyedSprite.width, building.visualHeight / destroyedSprite.height);
+                const newScaleFactor = originalScaleFactor * 2.0; // %100 daha büyük = 2 katı
+                destroyedSprite.setScale(newScaleFactor); 
                 this.destroyedBuildingSprites.add(destroyedSprite);
 
                 const finalExplosion = this.add.image(building.visualX, building.visualY, "explosion").setScale(2).setTint(0x800000);
@@ -327,7 +344,7 @@
             this.add.rectangle(gameWidth / 2, gameHeight / 2, gameWidth, gameHeight, 0, 0.7);
             this.add.text(gameWidth / 2, gameHeight / 2, "OYUN BİTTİ\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
             
-            saveScore(this.score);
+            saveScore(this.score); // Skoru kaydetmek için çağır
 
             window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
         }
@@ -344,14 +361,37 @@
         }
 
         const userDocRef = db.collection('users').doc(String(currentUser.id));
-        userDocRef.update({
-            score: firebase.firestore.FieldValue.increment(score),
-            username: currentUser.username || currentUser.first_name || `User${currentUser.id}`
-        }).catch(err => {
-            if (err.code === 'not-found') {
-                userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` });
-            } else { console.error("Firebase Hatası:", err); }
-        });
+
+        // Mevcut skoru oku ve daha yüksekse güncelle
+        userDocRef.get().then((doc) => {
+            let currentHighScore = 0;
+            if (doc.exists && doc.data().score) {
+                currentHighScore = doc.data().score;
+            }
+
+            if (score > currentHighScore) {
+                userDocRef.set({ 
+                    score: score, 
+                    username: currentUser.username || currentUser.first_name || `User${currentUser.id}` 
+                }, { merge: true }) // Merge: Sadece score ve username alanlarını günceller, diğerlerini korur
+                .then(() => {
+                    console.log("Yeni yüksek skor kaydedildi:", score);
+                })
+                .catch(err => {
+                    console.error("Yüksek skor kaydetme hatası:", err);
+                });
+            } else {
+                console.log("Yeni skor, mevcut yüksek skordan daha düşük veya eşit. Kaydedilmedi.");
+            }
+        }).catch(err => {
+            console.error("Skor okuma hatası:", err);
+            // Belge yoksa veya hata oluşursa ve ilk defa kaydediyorsak (veya merge:true işe yaramazsa)
+            // yine de set ile kaydetmeye çalışabiliriz.
+            // Bu kısım genellikle ilk çalıştırmada belge yoksa tetiklenir.
+            userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` }, { merge: true })
+                .then(() => console.log("İlk skor veya hata sonrası skor kaydedildi:", score))
+                .catch(e => console.error("Skor kaydetme hatası (fallback):", e));
+        });
     }
 
     const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade', arcade: { gravity: { y: 0 } } }, scene: GameScene };
