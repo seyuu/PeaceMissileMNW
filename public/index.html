@@ -397,7 +397,7 @@
             this.scoreText.setText("Score: " + this.score);
 
             // Patlama efekti (2 katı büyüklük)
-            const explosion = this.add.image(rocket.x, rocket.y, "explosion").setScale(2.0); 
+            const explosion = this.add.image(rocket.x, rocket.y, "explosion").setScale(1.5); 
             this.time.delayedCall(150, () => explosion.destroy());
 
             // Güvercin efekti (2 katı büyüklük)
