@@ -17,7 +17,7 @@
 
 function runGame() {
     try {
-        // --- 1. FIREBASE KURULUMU ---
+        // --- 1. KURULUM ---
         const firebaseConfig = {
             apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
             authDomain: "peacemissile-game.firebaseapp.com",
@@ -37,17 +37,30 @@ function runGame() {
         // --- 3. PHASER SAHNESİ ---
         class GameScene extends Phaser.Scene {
             constructor() { super({ key: 'GameScene' }); }
+            
             preload() {
                 const urlParams = new URLSearchParams(window.location.search);
                 this.selectedSide = urlParams.get('side') || 'israel';
                 this.load.image('background', `https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/${this.selectedSide}_bg.jpg`);
                 this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
-                // .gif dosyasını da yükleyelim
-                this.load.spritesheet('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif', { frameWidth: 64, frameHeight: 64 });
+                
+                // DÜZELTME: .gif dosyasını 'spritesheet' olarak YÜKLÜYORUZ.
+                // Not: frameWidth ve frameHeight değerlerini kendi GIF'inin bir karesinin boyutuna göre ayarla.
+                this.load.spritesheet('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif', { 
+                    frameWidth: 64, 
+                    frameHeight: 64 
+                });
             }
+
             create() {
-                // Patlama animasyonunu oluştur
-                this.anims.create({ key: 'explode_anim', frames: this.anims.generateFrameNumbers('explosion'), frameRate: 20, repeat: 0, hideOnComplete: true });
+                // DÜZELTME: Animasyonu bir kere, oyunun başında oluşturuyoruz.
+                this.anims.create({
+                    key: 'explode_anim',
+                    frames: this.anims.generateFrameNumbers('explosion', { start: 0, end: -1 }), // -1 tüm kareleri kullan demek
+                    frameRate: 20,
+                    repeat: 0, // Sadece bir kere oyna
+                    hideOnComplete: true // Bitince gizle
+                });
 
                 this.health = 3; this.isGameOver = false; sessionScore = 0;
                 let bg = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, 'background');
@@ -57,16 +70,21 @@ function runGame() {
                 this.rockets = this.physics.add.group();
                 this.time.addEvent({ delay: 1300, callback: this.spawnRocket, callbackScope: this, loop: true });
             }
+
             spawnRocket(){if(this.isGameOver)return;const e=Phaser.Math.Between(40,this.cameras.main.width-40),t=this.rockets.create(e,-100,"rocket");t.setAngle(180),t.setVelocityY(Phaser.Math.Between(300,500)),t.setInteractive({useHandCursor:!0}),t.on("pointerdown",()=>this.destroyRocket(t))}
-            destroyRocket(e){
-                if(!e.active)return;
+            
+            destroyRocket(rocket){
+                if(!rocket.active)return;
                 sessionScore+=10;
                 this.scoreText.setText("Score: "+sessionScore);
-                // Patlama animasyonunu oynat
-                let explosionSprite = this.add.sprite(e.x, e.y, 'explosion');
+                
+                // DÜZELTME: Patlama için artık image değil, sprite kullanıyoruz ve animasyonu oynatıyoruz.
+                let explosionSprite = this.add.sprite(rocket.x, rocket.y, 'explosion');
                 explosionSprite.play('explode_anim');
-                e.destroy();
+
+                rocket.destroy();
             }
+
             update() {
                 if (this.isGameOver) return;
                 this.rockets.children.each(rocket => {
@@ -77,6 +95,7 @@ function runGame() {
                     }
                 });
             }
+
             gameOver() {
                 if (this.isGameOver) return;
                 this.isGameOver = true; this.physics.pause();
@@ -103,9 +122,8 @@ function runGame() {
     } catch(e) {
         document.body.innerHTML = `<h1 style="color:red;">Error: ${e.message}</h1>`;
     }
-} // <-- EKSİK OLAN LANET PARANTEZ BURADA
+} 
 
-// --- BAŞLATICI ---
 if (window.Telegram && window.Telegram.WebApp) {
     window.Telegram.WebApp.ready(runGame);
 } else {
