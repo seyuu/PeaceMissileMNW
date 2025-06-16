@@ -12,6 +12,26 @@
 <body>
 <div id="phaser-game"></div>
 <script type="text/javascript">
+     const tg = window.Telegram.WebApp;
+    const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
+    let db; // Firebase veritabanı nesnesi
+
+    // --- Firebase Kurulumu (Oyunun Dışında) ---
+    try {
+        const firebaseConfig = {
+            apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
+            authDomain: "peacemissile-game.firebaseapp.com",
+            projectId: "peacemissile-game",
+            storageBucket: "peacemissile-game.firebasestorage.app",
+            messagingSenderId: "641906716058",
+            appId: "1:641906716058:web:1376e93994fab29f049e23"
+        };
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+    } catch (e) {
+        console.error("Firebase initialization failed:", e);
+    }
+
     class GameScene extends Phaser.Scene {
         constructor() {
             super({ key: 'GameScene' });
@@ -83,6 +103,19 @@
         gameOver(){this.gameIsOver=!0,this.physics.pause();const t=this.cameras.main.width,e=this.cameras.main.height;this.add.rectangle(t/2,e/2,t,e,0,.7),this.add.text(t/2,e/2,"GAME OVER\nFinal Score: "+this.score,{fontSize:"48px",fill:"#ff0000",align:"center"}).setOrigin(.5),window.Telegram&&window.Telegram.WebApp&&this.time.delayedCall(4e3,()=>window.Telegram.WebApp.close())}
     }
 
+       // --- Skoru Kaydeden Bağımsız Fonksiyon ---
+    function saveScore(score) {
+        const userDocRef = db.collection('users').doc(String(currentUser.id));
+        userDocRef.update({
+            score: firebase.firestore.FieldValue.increment(score),
+            username: currentUser.username || currentUser.first_name
+        }).catch(err => {
+            if (err.code === 'not-found') {
+                userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name });
+            } else { console.error("Firebase Error:", err); }
+        });
+    }
+    // --- Oyun Başlangıcı ---
     const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade', arcade: { gravity: { y: 0 } } }, scene: GameScene };
     try { const game = new Phaser.Game(config); } catch (e) { document.body.innerHTML = `<h1 style="color:red;">ERROR: ${e.message}</h1>`; }
 </script>
