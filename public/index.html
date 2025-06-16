@@ -52,6 +52,13 @@
 
             this.referenceWidth = 1080; // Görselin referans genişliği
             this.referenceHeight = 1920; // Görselin referans yüksekliği
+
+             // Logo parçaları referansları
+            this.logoPart1 = null;
+        this.logoPart2 = null;
+        this.logoPart3 = null;
+        this.logoPart4 = null;
+        this.fullLogo = null;
         }
 
         preload() {
@@ -68,7 +75,14 @@
             this.load.image('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif');
             this.load.image('destroyed_building', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/destroyed_building.png'); 
             this.load.image('dove', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/dove.png'); 
-        }
+       
+             // Logo parçalarını yükle (isimler ekran görüntüsüne göre)
+        this.load.image('logo_part_1', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_1.png');
+        this.load.image('logo_part_2', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_2.png');
+        this.load.image('logo_part_3', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_3.png');
+        this.load.image('logo_part_4', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_4.png');
+        this.load.image('full_logo', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo.png'); 
+         }
 
         create() {
             const gameWidth = this.cameras.main.width;
@@ -177,6 +191,16 @@
             
             this.time.addEvent({ delay: 1500, callback: this.spawnRocket, callbackScope: this, loop: true });
             this.time.addEvent({ delay: 1000, callback: this.increaseGameTime, callbackScope: this, loop: true });
+
+            // Logo parçalarını ve tam logoyu (opsiyonel) oluştur ve gizle
+        const logoScale = 0.25; // Başlangıç ölçeği, gerekirse ayarla
+        const fullLogoScale = 0.5; // Tam logo ölçeği, gerekirse ayarla
+
+        this.logoPart1 = this.add.image(0, 0, 'logo_part_1').setVisible(false).setScale(logoScale);
+        this.logoPart2 = this.add.image(0, 0, 'logo_part_2').setVisible(false).setScale(logoScale);
+        this.logoPart3 = this.add.image(0, 0, 'logo_part_3').setVisible(false).setScale(logoScale);
+        this.logoPart4 = this.add.image(0, 0, 'logo_part_4').setVisible(false).setScale(logoScale);
+        this.fullLogo = this.add.image(gameWidth / 2, gameHeight / 2, 'full_logo').setVisible(false).setScale(fullLogoScale); // Opsiyonel
         }
 
         updateHealthBar() {
@@ -452,11 +476,13 @@
             this.updateHealthBar(); 
 
             if (this.buildingsDestroyed >= this.totalBuildings) {
-                this.gameOver();
-            }
+            saveScore(this.score, (isNewHighScore) => {
+                this.gameOver(isNewHighScore);
+            });
+        }
         }
 
-        gameOver() {
+        gameOver(isNewHighScore = false) {
             if (this.gameIsOver) return;
             this.gameIsOver = true;
             this.physics.pause();
@@ -465,25 +491,58 @@
             
             const gameWidth = this.cameras.main.width;
             const gameHeight = this.cameras.main.height;
+            const centerX = gameWidth / 2;
+            const centerY = gameHeight / 2;
 
-            this.add.rectangle(gameWidth / 2, gameHeight / 2, gameWidth, gameHeight, 0, 0.7);
-            this.add.text(gameWidth / 2, gameHeight / 2, "OYUN BİTTİ\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
-            
-            saveScore(this.score); // Skoru kaydetmek için çağır
+              this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0x000000, 0.7);
+            if (isNewHighScore) {
+            const logoScale = 0.5; // Birleşmiş logonun ölçeği
+            const targetX1 = centerX - (this.textures.get('logo_part_1').getSourceImage().width * logoScale) / 2;
+            const targetY1 = centerY - (this.textures.get('logo_part_1').getSourceImage().height * logoScale) / 2;
+            const targetX2 = centerX + (this.textures.get('logo_part_2').getSourceImage().width * logoScale) / 2;
+            const targetY2 = centerY - (this.textures.get('logo_part_2').getSourceImage().height * logoScale) / 2;
+            const targetX3 = centerX - (this.textures.get('logo_part_3').getSourceImage().width * logoScale) / 2;
+            const targetY3 = centerY + (this.textures.get('logo_part_3').getSourceImage().height * logoScale) / 2;
+            const targetX4 = centerX + (this.textures.get('logo_part_4').getSourceImage().width * logoScale) / 2;
+            const targetY4 = centerY + (this.textures.get('logo_part_4').getSourceImage().height * logoScale) / 2;
 
-            window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
+            const startOffset = Math.max(gameWidth, gameHeight); // Köşelerden gelmesi için yeterli uzaklık
+
+            this.logoPart1.setPosition(centerX - startOffset, centerY - startOffset).setVisible(true).setScale(logoScale); // Sol Üst
+            this.logoPart2.setPosition(centerX + startOffset, centerY - startOffset).setVisible(true).setScale(logoScale); // Sağ Üst
+            this.logoPart3.setPosition(centerX - startOffset, centerY + startOffset).setVisible(true).setScale(logoScale); // Sol Alt
+            this.logoPart4.setPosition(centerX + startOffset, centerY + startOffset).setVisible(true).setScale(logoScale); // Sağ Alt
+
+            const tweenDuration = 1500;
+            const ease = 'Power2';
+
+            this.tweens.add({ targets: this.logoPart1, x: centerX - (this.textures.get('logo_part_1').getSourceImage().width * logoScale) / 4, y: centerY - (this.textures.get('logo_part_1').getSourceImage().height * logoScale) / 4, duration: tweenDuration, ease: ease });
+            this.tweens.add({ targets: this.logoPart2, x: centerX + (this.textures.get('logo_part_2').getSourceImage().width * logoScale) / 4, y: centerY - (this.textures.get('logo_part_2').getSourceImage().height * logoScale) / 4, duration: tweenDuration, ease: ease });
+            this.tweens.add({ targets: this.logoPart3, x: centerX - (this.textures.get('logo_part_3').getSourceImage().width * logoScale) / 4, y: centerY + (this.textures.get('logo_part_3').getSourceImage().height * logoScale) / 4, duration: tweenDuration, ease: ease });
+            this.tweens.add({
+                targets: this.logoPart4,
+                x: centerX + (this.textures.get('logo_part_4').getSourceImage().width * logoScale) / 4,
+                y: centerY + (this.textures.get('logo_part_4').getSourceImage().height * logoScale) / 4,
+                duration: tweenDuration,
+                ease: ease,
+                onComplete: () => {
+                    this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * logoScale) / 2 + 50, "YENİ YÜKSEK SKOR!\nSkor: " + this.score, { fontSize: "40px", fill: "#00FF00", align: "center" }).setOrigin(0.5);
+                    window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
+                }
+            });
+        } else {
+            this.add.text(centerX, centerY, "OYUN BİTTİ\nSon Skor: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
+            window.Telegram && window.Telegram.WebApp && this.time.delayedCall(4000, () => window.Telegram.WebApp.close());
+        }
         }
     }
 
-    function saveScore(score) {
-        if (!db) {
-            console.error("Firebase Firestore başlatılmadı. Skor kaydedilemiyor.");
-            return;
-        }
-        if (!currentUser || !currentUser.id) {
-            console.warn("Telegram kullanıcı verileri mevcut değil. Skor belirli bir kullanıcıya kaydedilmeyecek.");
-            return;
-        }
+    function saveScore(score, callback) {
+         if (!db || !currentUser || !currentUser.id) {
+        console.warn("Firebase veya kullanıcı bilgisi mevcut değil, skor kaydedilemiyor.");
+        if (callback) callback(false);
+        return;
+    }
 
         const userDocRef = db.collection('users').doc(String(currentUser.id));
 
@@ -494,7 +553,9 @@
                 currentHighScore = doc.data().score;
             }
 
+             let isNewHighScore = false;
             if (score > currentHighScore) {
+                isNewHighScore = true;
                 userDocRef.set({ 
                     score: score, 
                     username: currentUser.username || currentUser.first_name || `User${currentUser.id}` 
