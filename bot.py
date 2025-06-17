@@ -62,7 +62,7 @@ async def start(update: Update, context: CallbackContext) -> None:
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    photo_url = "https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/assets/logo.png"
+    photo_url = "https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo.png"
     
     await update.message.reply_photo(
         photo=photo_url,
