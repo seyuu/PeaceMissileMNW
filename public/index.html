@@ -1,58 +1,80 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Peace Missile - Mission Hub</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
-    <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } </style>
-</head>
-<body>
-<div id="phaser-game"></div>
 <script type="text/javascript">
+    // --- Global Değişkenler ve Kurulum ---
+    let db;
+    try {
+        const firebaseConfig = {
+            apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
+            authDomain: "peacemissile-game.firebaseapp.com",
+            projectId: "peacemissile-game",
+            storageBucket: "peacemissile-game.firebasestorage.app",
+            messagingSenderId: "641906716058",
+            appId: "1:641906716058:web:1376e93994fab29f049e23"
+        };
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+    } catch (e) {
+        console.error("Firebase init hatası:", e);
+    }
+    const tg = window.Telegram.WebApp;
+    const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
 
+    // --- Lobi Sahnesi ---
     class LobbyScene extends Phaser.Scene {
         constructor() { super({ key: 'LobbyScene' }); }
-
         preload() {
             this.load.image('lobby_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/lobby_bg.jpg');
             this.load.image('play_button', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/play_button.png');
             this.load.image('score_icon', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/score_icon.png');
             this.load.image('coin_icon', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/coin_icon.png');
         }
-
         create() {
             const gameWidth = this.cameras.main.width;
             const gameHeight = this.cameras.main.height;
-            this.add.image(gameWidth / 2, gameHeight / 2, 'lobby_bg').setDisplaySize(gameWidth, gameHeight);
-
-            const tg = window.Telegram.WebApp;
-            const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
-
-            this.add.text(gameWidth / 2, 100, `Welcome, ${currentUser ? currentUser.first_name : 'Ambassador'}!`, { 
-                fontSize: '48px', fill: '#fff', stroke: '#000', strokeThickness: 6, fontFamily: 'Poppins' 
-            }).setOrigin(0.5);
+            this.add.image(gameWidth/2, gameHeight/2, 'lobby_bg').setDisplaySize(gameWidth, gameHeight);
+            this.add.text(gameWidth/2, 100, `Welcome, ${currentUser ? currentUser.first_name : 'Ambassador'}!`, { fontSize: '48px', fill: '#fff', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
             
-            const playButton = this.add.image(gameWidth / 2, gameHeight - 150, 'play_button').setScale(0.8).setInteractive({ useHandCursor: true });
+            const playButton = this.add.image(gameWidth/2, gameHeight - 150, 'play_button').setScale(0.8).setInteractive({ useHandCursor: true });
             
+            // YENİ: Butona basıldığında GameScene'i başlat
             playButton.on('pointerdown', () => {
-                // Şimdilik sadece konsola yazdır, sahne geçişi yok.
-                console.log("Play button clicked!");
-                playButton.setAlpha(0.7);
+                this.scene.start('GameScene'); 
             });
 
-            // İstatistikleri şimdilik "placeholder" (yer tutucu) olarak gösteriyoruz.
-            this.add.image(gameWidth / 2 - 100, 250, 'score_icon').setScale(0.7);
-            this.add.text(gameWidth / 2 + 40, 250, `12345\n(High Score)`, { fontSize: '28px', fill: '#fff', align: 'center', fontFamily: 'Poppins' }).setOrigin(0.5);
+            const highScoreText = this.add.text(gameWidth/2 + 40, 250, `Loading...`, { fontSize: '28px', fill: '#fff', align: 'center' }).setOrigin(0.5);
+            const coinsText = this.add.text(gameWidth/2 + 40, 350, `Loading...`, { fontSize: '28px', fill: '#fff', align: 'center' }).setOrigin(0.5);
+            this.add.image(gameWidth/2 - 100, 250, 'score_icon').setScale(0.7);
+            this.add.image(gameWidth/2 - 100, 350, 'coin_icon').setScale(0.7);
             
-            this.add.image(gameWidth / 2 - 100, 350, 'coin_icon').setScale(0.7);
-            this.add.text(gameWidth / 2 + 40, 350, `999999\n($PMNOFO)`, { fontSize: '28px', fill: '#fff', align: 'center', fontFamily: 'Poppins' }).setOrigin(0.5);
+            // YENİ: Firebase'den veriyi çek ve ekranı güncelle
+            if (currentUser && db) {
+                const userDocRef = db.collection('users').doc(String(currentUser.id));
+                userDocRef.get().then(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        highScoreText.setText(`${data.score || 0}\n(High Score)`);
+                        coinsText.setText(`${data.total_pmno_coins || 0}\n($PMNOFO)`);
+                    } else {
+                        highScoreText.setText(`0\n(High Score)`);
+                        coinsText.setText(`0\n($PMNOFO)`);
+                    }
+                }).catch(err => console.error("Veri çekme hatası:", err));
+            }
         }
     }
-    
-    const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, scene: LobbyScene };
+
+    // --- ASIL OYUN SAHNESİ ---
+    class GameScene extends Phaser.Scene {
+        // ... Burası, daha önce çalışan 'Can ve Bina Koruma' adımındaki GameScene kodunun BİREBİR AYNISI ...
+        constructor(){super({key:"GameScene"})}preload(){const e=new URLSearchParams(window.location.search);this.selectedSide=e.get("side")||"israel";const t=this.selectedSide==="iran"?"iran_bg":"israel_bg";const a=`https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/${t}.jpg`;this.load.image("background",a),this.load.image("rocket","https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png"),this.load.spritesheet("explosion","https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif",{frameWidth:64,frameHeight:64})}create(){this.anims.create({key:"explode_anim",frames:this.anims.generateFrameNumbers("explosion"),frameRate:20,repeat:0,hideOnComplete:!0}),this.score=0,this.health=3,this.isGameOver=!1;let e=this.add.image(this.cameras.main.centerX,this.cameras.main.centerY,"background");e.setDisplaySize(this.cameras.main.width,this.cameras.main.height),this.buildings=this.physics.add.staticGroup(),this.buildings.create(this.cameras.main.width/2,this.cameras.main.height).setSize(this.cameras.main.width,.2*this.cameras.main.height).setOrigin(.5,.8).setVisible(!1).refreshBody(),this.scoreText=this.add.text(16,16,"Score: 0",{fontSize:"32px",fill:"#fff",stroke:"#000",strokeThickness:4}),this.healthText=this.add.text(this.cameras.main.width-16,16,"Health: 3",{fontSize:"32px",fill:"#fff",stroke:"#000",strokeThickness:4}).setOrigin(1,0),this.rockets=this.physics.add.group(),this.physics.add.collider(this.rockets,this.buildings,this.hitBuilding,null,this),this.time.addEvent({delay:1200,callback:this.spawnRocket,callbackScope:this,loop:!0})}spawnRocket(){if(this.isGameOver)return;const e=Phaser.Math.Between(40,this.cameras.main.width-40),t=this.rockets.create(e,-100,"rocket");t.setAngle(180),t.setVelocityY(Phaser.Math.Between(200,400)),t.setInteractive({useHandCursor:!0}),t.on("pointerdown",()=>this.destroyRocket(t))}destroyRocket(e){if(!e.active)return;this.score+=10,this.scoreText.setText("Score: "+this.score);let t=this.add.sprite(e.x,e.y,"explosion");t.play("explode_anim"),e.destroy()}hitBuilding(e,t){if(!e.active)return;this.health-=1,this.healthText.setText("Health: "+this.health);let s=this.add.sprite(e.x,e.y+20,"explosion").setScale(1.2).setTint(16711680);s.play("explode_anim"),this.cameras.main.shake(100,.01),e.destroy(),this.health<=0&&this.gameOver()}gameOver(){this.isGameOver=!0,this.physics.pause(),this.add.text(this.cameras.main.centerX,this.cameras.main.centerY,"GAME OVER\nFinal Score: "+this.score,{fontSize:"48px",fill:"#ff0000",align:"center"}).setOrigin(.5);if(currentUser&&this.score>0&&db){const e=db.collection("users").doc(String(currentUser.id));e.get().then(t=>{t.exists?e.update({total_score:firebase.firestore.FieldValue.increment(this.score),total_pmno_coins:firebase.firestore.FieldValue.increment(this.score+(this.score>t.data().score?100*this.score:0)),score:Math.max(t.data().score,this.score)}):e.set({score:this.score,total_score:this.score,total_pmno_coins:this.score+100*this.score,username:currentUser.username||currentUser.first_name,user_id:currentUser.id})}).catch(e=>console.error("Firebase Error:",e))}if(tg){setTimeout(()=>tg.close(),4e3)}}}
+
+    // --- Oyun Yapılandırması ---
+    const config = { 
+        type: Phaser.AUTO, 
+        width: window.innerWidth, 
+        height: window.innerHeight, 
+        physics: { default: 'arcade' }, 
+        scene: [ Preloader, LobbyScene, GameScene ] // Artık 3 sahnemiz var
+    };
     new Phaser.Game(config);
 
 </script>
