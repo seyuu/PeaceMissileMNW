@@ -161,8 +161,7 @@
             const gameHeight = this.cameras.main.height;
 
             // Arka planı ekran boyutuna sığdır
-            this.add.image(gameWidth / 2, gameHeight / 2, 'lobby_bg').setDisplaySize(gameWidth, gameHeight);
-
+ this.add.image(gameWidth / 2, gameHeight / 2, 'lobby_bg').setDisplaySize(gameWidth, gameHeight).setDepth(0); // Değişiklik burada!
             // "Welcome, Serdar" yazısı - Font boyutunu ekran genişliğine göre ayarla
             // Font boyutu için daha dinamik bir yaklaşım
             const welcomeFontSize = Math.max(24, Math.floor(gameWidth * 0.05)); // Minimum 24px, genişliğin %5'i kadar
@@ -177,7 +176,8 @@
             const playButtonScale = Math.min(1.0, gameWidth / this.textures.get('play_button').width * 0.7); // Genişliğin %70'ine kadar sığdır
             const playButton = this.add.image(gameWidth / 2, gameHeight * 0.8, 'play_button')
                 .setScale(playButtonScale) 
-                .setInteractive({ useHandCursor: true });
+                .setInteractive({ useHandCursor: true })
+.setDepth(2);
 
             playButton.on('pointerdown', () => {
                 this.scene.start('GameScene');
