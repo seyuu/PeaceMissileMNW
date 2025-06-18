@@ -62,7 +62,7 @@ async def web_app_data_handler(update: Update, context: CallbackContext) -> None
     try:
         payload = json.loads(data)
         user_id = payload.get("user_id")
-        final_score = payload.get("final_score")
+        final_score = payload.get("score")
 
         if not user_id or final_score is None:
             logger.error(f"Invalid payload from Web App: {payload}")
