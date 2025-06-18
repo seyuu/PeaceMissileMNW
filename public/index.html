@@ -9,28 +9,40 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style> 
-        body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } 
-        canvas { display: block; } 
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background-color: #000; 
+            /* Mobil cihazlarda scrollbar veya boşluk oluşmaması için */
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        } 
+        canvas { 
+            display: block; 
+            /* Canvas'ın da ebeveynine göre tam boyut almasını sağlar */
+            max-width: 100vw;
+            max-height: 100vh;
+        } 
     </style>
 </head>
 <body>
 <div id="phaser-game"></div>
 <script type="text/javascript">
-    // Global değişkenler, Preloader veya diğer sahnelerden erişilebilir olsun
     let tg;
     let currentUser;
     let db;
-    let userWalletAddress = null; // Cüzdan bağlantısı için
+    let userWalletAddress = null; 
 
-    // --- Preloader Sahnesi ---
-    // Oyun başlamadan önce Firebase, Telegram ve diğer kaynakları yükler
     class Preloader extends Phaser.Scene {
         constructor() {
             super({ key: 'Preloader' });
         }
 
         preload() {
-            // Yükleme çubuğu veya ekranı için görsel ekleyebilirsiniz
             let progressBar = this.add.graphics();
             let progressBox = this.add.graphics();
             progressBox.fillStyle(0x222222, 0.8);
@@ -68,10 +80,9 @@
                 progressBox.destroy();
                 loadingText.destroy();
                 percentText.destroy();
-                this.scene.start('LobbyScene'); // Yükleme bittikten sonra Lobi Sahnesine geç
+                this.scene.start('LobbyScene'); 
             }, this);
 
-            // Tüm oyun varlıklarını burada yükleyin
             this.load.image('lobby_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/lobby_bg.jpg');
             this.load.image('play_button', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/play_button.png');
             this.load.image('score_icon', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/score_icon.png');
@@ -88,17 +99,18 @@
             this.load.image('logo_part_4', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_4.png');
             this.load.image('full_logo', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo.png'); 
 
-            // Arka plan resimlerini de burada yükleyin (ikisinden birini kullanacağınız için ikisini de yüklemek sorun değil)
             this.load.image('israel_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/israel_bg.jpg');
             this.load.image('iran_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/iran_bg.jpg');
         }
 
         create() {
-            // Firebase ve Telegram Web App'i burada başlat
             tg = window.Telegram.WebApp;
             currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
             tg.ready();
             tg.expand();
+            console.log("Telegram WebApp Ready and Expanded.");
+            console.log("Telegram initDataUnsafe:", tg.initDataUnsafe); // Debug için ekledim
+            console.log("Current User:", currentUser); // Debug için ekledim
 
             try {
                 const firebaseConfig = {
@@ -122,71 +134,76 @@
         }
     }
 
-    // --- Lobi Sahnesi --- (Önceki kodunuzdan restore edildi ve düzenlendi)
     class LobbyScene extends Phaser.Scene {
         constructor() {
             super({ key: 'LobbyScene' });
         }
 
-        // Preload'a artık gerek yok, tüm varlıklar Preloader'da yüklendi
-        // preload() { } 
-
         create() {
             const gameWidth = this.cameras.main.width;
             const gameHeight = this.cameras.main.height;
 
-            // Arka planı ekran boyutuna göre ayarla
             this.add.image(gameWidth / 2, gameHeight / 2, 'lobby_bg').setDisplaySize(gameWidth, gameHeight);
 
-            this.add.text(gameWidth / 2, 100, `Welcome, ${currentUser ? currentUser.first_name : 'Ambassador'}!`, { 
-                fontSize: '48px', 
+            this.add.text(gameWidth / 2, gameHeight * 0.15, `Welcome, ${currentUser ? currentUser.first_name : 'Ambassador'}!`, { 
+                fontSize: '38px', // Boyutu küçültüldü
                 fill: '#fff', 
                 stroke: '#000', 
                 strokeThickness: 6 
             }).setOrigin(0.5);
 
-            const playButton = this.add.image(gameWidth / 2, gameHeight - 150, 'play_button')
-                .setScale(0.8)
+            const playButton = this.add.image(gameWidth / 2, gameHeight * 0.8, 'play_button')
+                .setScale(0.6) // Boyutu küçültüldü
                 .setInteractive({ useHandCursor: true });
 
             playButton.on('pointerdown', () => {
                 this.scene.start('GameScene');
             });
 
-            // Skor ve Coin ikonları
-            this.add.image(gameWidth / 2 - 100, 250, 'score_icon').setScale(0.7);
-            this.add.image(gameWidth / 2 - 100, 350, 'coin_icon').setScale(0.7);
+            this.add.image(gameWidth / 2 - 100, gameHeight * 0.35, 'score_icon').setScale(0.5); // Boyutu ve Y pozisyonu ayarlandı
+            this.add.image(gameWidth / 2 - 100, gameHeight * 0.45, 'coin_icon').setScale(0.5); // Boyutu ve Y pozisyonu ayarlandı
 
-            // Skor ve Coin metinleri
-            const highScoreText = this.add.text(gameWidth / 2 + 40, 250, `Loading...`, { fontSize: '28px', fill: '#fff' }).setOrigin(0.5);
-            const coinsText = this.add.text(gameWidth / 2 + 40, 350, `Loading...`, { fontSize: '28px', fill: '#fff' }).setOrigin(0.5);
+            const highScoreText = this.add.text(gameWidth / 2 + 40, gameHeight * 0.35, `Loading...`, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5); // Boyutu küçültüldü
+            const coinsText = this.add.text(gameWidth / 2 + 40, gameHeight * 0.45, `Loading...`, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5); // Boyutu küçültüldü
 
-            // Firebase'den kullanıcı verilerini çek
             if (currentUser && db) {
                 const userDocRef = db.collection('users').doc(String(currentUser.id));
                 userDocRef.get().then(doc => {
                     if (doc.exists) {
                         const data = doc.data();
                         highScoreText.setText(`${data.score || 0}`);
-                        coinsText.setText(`${data.total_pmno_coins || 0}`); // Coinlerinizin adı bu şekildeydi
+                        coinsText.setText(`${data.total_pmno_coins || 0}`);
+                        console.log("Firebase user data loaded:", data); // Debug için ekledim
                     } else {
                         highScoreText.setText(`0`);
                         coinsText.setText(`0`);
+                        console.log("Firebase user document does not exist, creating new default values.");
+                        // Kullanıcı yoksa varsayılan değerlerle belge oluştur
+                        userDocRef.set({
+                            score: 0,
+                            total_pmno_coins: 0,
+                            total_score: 0,
+                            username: currentUser.username || currentUser.first_name || `User${currentUser.id}`,
+                            user_id: currentUser.id
+                        }, { merge: true }).then(() => {
+                            console.log("Initial user document created.");
+                        }).catch(e => {
+                            console.error("Error creating initial user document:", e);
+                        });
                     }
                 }).catch(err => {
-                    console.error("Data fetch error:", err);
+                    console.error("Error fetching Firebase user data:", err);
                     highScoreText.setText(`Error`);
                     coinsText.setText(`Error`);
                 });
             } else {
                 highScoreText.setText(`N/A`);
                 coinsText.setText(`N/A`);
-                console.warn("Firebase veya currentUser mevcut değil. Skorlar yüklenemiyor.");
+                console.warn("Firebase or currentUser not available in LobbyScene. Scores cannot be loaded.");
             }
         }
     }
 
-    // --- Oyun Sahnesi --- (Önceki kodunuzdan kopyalanıp düzenlendi)
     class GameScene extends Phaser.Scene {
         constructor() {
             super({ key: 'GameScene' });
@@ -209,8 +226,6 @@
         }
 
         preload() {
-            // Arka plan resmi artık Preloader'da yüklendiği için burada tekrar yüklemeye gerek yok.
-            // Sadece hangi arka planın kullanılacağını belirle
             const urlParams = new URLSearchParams(window.location.search);
             this.selectedSide = urlParams.get('side') || 'israel';
         }
@@ -219,7 +234,6 @@
             const gameWidth = this.cameras.main.width;
             const gameHeight = this.cameras.main.height;
 
-            // Arka planı ekran boyutuna göre ayarla (Preloader'da yüklendiği için anahtarı kullanıyoruz)
             const bgKey = this.selectedSide === 'iran' ? 'iran_bg' : 'israel_bg';
             let bg = this.add.image(gameWidth / 2, gameHeight / 2, bgKey);
             bg.setDisplaySize(gameWidth, gameHeight);
@@ -248,7 +262,7 @@
                     width: (200 / this.referenceWidth) * gameWidth, 
                     height: 250 
                 });
-            } else { // iran
+            } else { 
                 buildingsData.push({ 
                     x: (325 / this.referenceWidth) * gameWidth, 
                     yOffsetFromBottom: 400, 
@@ -312,12 +326,12 @@
 
             let totalCurrentHealth = 0;
             this.buildings.children.each(b => {
-                if (b.body.enable) { // Sadece aktif binaların sağlığını hesapla
+                if (b.body.enable) { 
                      totalCurrentHealth += b.buildingHealth;
                 }
             });
             const totalMaxHealth = this.totalBuildings * this.maxBuildingHealth;
-            const healthRatio = totalMaxHealth > 0 ? totalCurrentHealth / totalMaxHealth : 0; // Sıfır bölme hatasını önle
+            const healthRatio = totalMaxHealth > 0 ? totalCurrentHealth / totalMaxHealth : 0; 
 
             this.healthBar.fillStyle(0x000000, 0.7); 
             this.healthBar.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
@@ -477,7 +491,7 @@
             this.updateHealthBar(); 
 
             if (this.buildingsDestroyed >= this.totalBuildings) {
-                this.saveGameScore(this.score, (isNewHighScore) => { // saveScore'u this.saveGameScore olarak değiştirdim
+                this.saveGameScore(this.score, (isNewHighScore) => { 
                     this.gameOver(isNewHighScore);
                 });
             }
@@ -543,18 +557,15 @@
 
                         this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * fullLogoScale) / 2 + 50, "New Score!\n: " + this.score, newHighScoreTextStyle).setOrigin(0.5); 
                         
-                        // Oyun bittikten sonra Lobi Sahnesine dön
                         this.time.delayedCall(4000, () => this.scene.start('LobbyScene')); 
                     }
                 });
             } else {
                 this.add.text(centerX, centerY, "Game Over\nScore: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
-                // Oyun bittikten sonra Lobi Sahnesine dön
                 this.time.delayedCall(4000, () => this.scene.start('LobbyScene')); 
             }
         }
 
-        // Skor kaydetme fonksiyonu artık GameScene içinde
         async saveGameScore(score, callback) {
             if (!db || !currentUser || !currentUser.id) {
                 console.warn("Firebase veya kullanıcı bilgisi mevcut değil, skor kaydedilemiyor.");
@@ -568,37 +579,33 @@
                 const doc = await userDocRef.get();
                 let currentHighScore = 0;
                 let totalCoins = 0;
-                let totalScore = 0;
                 let username = currentUser.username || currentUser.first_name || `User${currentUser.id}`;
 
                 if (doc.exists) {
                     const data = doc.data();
                     currentHighScore = data.score || 0;
                     totalCoins = data.total_pmno_coins || 0;
-                    totalScore = data.total_score || 0;
                 }
 
                 let isNewHighScore = false;
                 let updateData = {
-                    total_score: firebase.firestore.FieldValue.increment(score) // Her zaman toplam skoru artır
+                    total_score: firebase.firestore.FieldValue.increment(score) 
                 };
 
                 if (score > currentHighScore) {
                     isNewHighScore = true;
-                    updateData.score = score; // Sadece yeni yüksek skor ise en yüksek skoru güncelle
-                    updateData.total_pmno_coins = firebase.firestore.FieldValue.increment(score + (100 * score)); // Yeni yüksek skor ise bonus coin ekle
+                    updateData.score = score; 
+                    updateData.total_pmno_coins = firebase.firestore.FieldValue.increment(score + (100 * score)); 
                 } else {
-                    // Yeni yüksek skor değilse de coinleri ekle, ancak bonusu vermeden
                     updateData.total_pmno_coins = firebase.firestore.FieldValue.increment(score); 
                 }
 
-                // Kullanıcı adını da güncellenecek verilere ekleyelim (ya da ilk set'te ayarlanmalıydı)
                 updateData.username = username;
                 updateData.user_id = currentUser.id;
 
                 await userDocRef.set(updateData, { merge: true });
                 console.log("Skor ve coinler Firebase'e kaydedildi/güncellendi.");
-                sendScoreToBot(currentUser.id, score); // Bot'a skor gönder
+                sendScoreToBot(currentUser.id, score); 
                 if (callback) callback(isNewHighScore);
 
             } catch (error) {
@@ -608,8 +615,6 @@
         }
     }
 
-    // sendScoreToBot fonksiyonu (Telegram WebApp'e skor göndermek için)
-    // Bu fonksiyon globalde kalmalı veya uygun bir şekilde erişilebilir olmalı.
     function sendScoreToBot(userId, score) {
         if (tg && tg.sendData) {
             const data = {
@@ -624,7 +629,6 @@
         }
     }
 
-
     const config = { 
         type: Phaser.AUTO, 
         width: window.innerWidth, 
@@ -635,10 +639,9 @@
                 gravity: { y: 0 } 
             } 
         }, 
-        scene: [Preloader, LobbyScene, GameScene] // Sahneleri doğru sıraya koydum
+        scene: [Preloader, LobbyScene, GameScene] 
     };
 
-    // Oyun başlatma fonksiyonu
     function startGame() {
         try { 
             const game = new Phaser.Game(config); 
@@ -649,7 +652,6 @@
         }
     }
 
-    // Sayfa yüklendiğinde oyunu başlat
     window.addEventListener('load', startGame);
 
 </script>
