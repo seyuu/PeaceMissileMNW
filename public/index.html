@@ -2,106 +2,44 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Peace Missile - Mission Hub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Background Test</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } </style>
+    <style> body, html { margin: 0; padding: 0; overflow: hidden; } </style>
 </head>
 <body>
 <div id="phaser-game"></div>
 <script type="text/javascript">
     
-    function runGame() {
-        const tg = window.Telegram.WebApp;
-        const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
-        let db;
-        try {
-            const firebaseConfig = {
-                apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
-                authDomain: "peacemissile-game.firebaseapp.com",
-                projectId: "peacemissile-game",
-                storageBucket: "peacemissile-game.firebasestorage.app",
-                messagingSenderId: "641906716058",
-                appId: "1:641906716058:web:1376e93994fab29f049e23"
-            };
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-        } catch (e) {
-            console.error("Firebase init failed:", e);
-        }
-
-        class LobbyScene extends Phaser.Scene {
-            constructor() { super({ key: 'LobbyScene' }); }
-
-            preload() {
-                // Sadece lobi için gerekli resimleri yükle
-                this.load.image('lobby_bg', 'assets/lobby_bg.jpg');
-                this.load.image('play_button', 'assets/play_button.png');
-                this.load.image('score_icon', 'assets/score_icon.png');
-                this.load.image('coin_icon', 'assets/coin_icon.png');
-            }
-
-            async create() {
-                const gameWidth = this.cameras.main.width;
-                const gameHeight = this.cameras.main.height;
-                this.add.image(gameWidth / 2, gameHeight / 2, 'lobby_bg').setDisplaySize(gameWidth, gameHeight);
-
-                this.add.text(gameWidth / 2, 100, `Welcome, ${currentUser ? currentUser.first_name : 'Ambassador'}!`, { fontSize: '48px', fill: '#fff', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
-
-                const playButton = this.add.image(gameWidth / 2, gameHeight - 150, 'play_button').setScale(0.8).setInteractive({ useHandCursor: true });
-                
-                playButton.on('pointerdown', () => {
-                    // ŞİMDİLİK HİÇBİR ŞEY YAPMIYOR, SADECE TIKLANDIĞINI GÖSTERİYOR
-                    playButton.setTint(0xaaaaaa);
-                    this.time.delayedCall(100, () => playButton.clearTint());
-                    console.log("Play button clicked!");
-                });
-
-                // Başlangıçta istatistikleri boş göster
-                const highScoreText = this.add.text(gameWidth / 2 + 20, 250, `...\n(High Score)`, { fontSize: '28px', fill: '#fff', align: 'center' }).setOrigin(0.5);
-                const coinsText = this.add.text(gameWidth / 2 + 20, 350, `...\n($PMNOFO)`, { fontSize: '28px', fill: '#fff', align: 'center' }).setOrigin(0.5);
-                this.add.image(gameWidth / 2 - 100, 250, 'score_icon').setScale(0.7);
-                this.add.image(gameWidth / 2 - 100, 350, 'coin_icon').setScale(0.7);
-                
-                // Firebase'den veriyi çek ve ekranı güncelle
-                if (currentUser && db) {
-                    const userDocRef = db.collection('users').doc(String(currentUser.id));
-                    try {
-                        const doc = await userDocRef.get();
-                        if (doc.exists) {
-                            const data = doc.data();
-                            highScoreText.setText(`${data.score || 0}\n(High Score)`);
-                            coinsText.setText(`${data.total_pmno_coins || 0}\n($PMNOFO)`);
-                        } else {
-                            highScoreText.setText(`0\n(High Score)`);
-                            coinsText.setText(`0\n($PMNOFO)`);
-                        }
-                    } catch (e) {
-                        console.error("Error fetching stats:", e);
-                        highScoreText.setText(`Error\n(High Score)`);
-                        coinsText.setText(`Error\n($PMNOFO)`);
-                    }
-                }
-            }
+    class TestScene extends Phaser.Scene {
+        constructor() {
+            super({ key: 'TestScene' });
         }
         
-        const config = {
-            type: Phaser.AUTO,
-            width: window.innerWidth,
-            height: window.innerHeight,
-            scene: LobbyScene // Sadece Lobi Sahnesini başlat
-        };
-        new Phaser.Game(config);
+        preload() {
+            // Sadece tek bir resim yüklemeyi dene.
+            this.load.image('lobby_background', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/lobby_bg.jpg');
+        }
+
+        create() {
+            // Yüklenen resmi ekrana çiz.
+            let bg = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, 'lobby_background');
+            // Ekranı kaplamasını sağla
+            bg.setDisplaySize(this.cameras.main.width, this.cameras.main.height);
+        }
     }
 
-    if (window.Telegram && window.Telegram.WebApp) {
-        Telegram.WebApp.ready(runGame);
-    } else {
-        window.addEventListener('load', runGame);
-    }
+    const config = {
+        type: Phaser.AUTO,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scene: TestScene,
+        parent: 'phaser-game'
+    };
+
+    // Herhangi bir gecikme veya karmaşık başlatıcı olmadan, doğrudan oyunu başlat.
+    new Phaser.Game(config);
+
 </script>
 </body>
 </html>
