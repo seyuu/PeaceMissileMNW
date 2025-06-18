@@ -14,19 +14,25 @@
             padding: 0; 
             overflow: hidden; 
             background-color: #000; 
-            /* Mobil cihazlarda scrollbar veya boşluk oluşmaması için */
-            width: 100%;
-            height: 100%;
+            width: 100vw; /* Görünüm portunun tam genişliği */
+            height: 100vh; /* Görünüm portunun tam yüksekliği */
             display: flex;
             justify-content: center;
             align-items: center;
         } 
         canvas { 
             display: block; 
-            /* Canvas'ın da ebeveynine göre tam boyut almasını sağlar */
-            max-width: 100vw;
-            max-height: 100vh;
+            width: 100%; /* Kapsayıcısına göre tam genişlik */
+            height: 100%; /* Kapsayıcısına göre tam yükseklik */
         } 
+        #phaser-game {
+            width: 100vw;
+            height: 100vh;
+            /* Flexbox'ın canvas'ı ortalamasını sağlar */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -37,12 +43,23 @@
     let db;
     let userWalletAddress = null; 
 
+    // Firebase yapılandırmasını global olarak tanımla
+    const firebaseConfig = {
+        apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
+        authDomain: "peacemissile-game.firebaseapp.com",
+        projectId: "peacemissile-game",
+        storageBucket: "peacemissile-game.firebasestorage.app",
+        messagingSenderId: "641906716058",
+        appId: "1:641906716058:web:1376e93994fab29f049e23"
+    };
+
     class Preloader extends Phaser.Scene {
         constructor() {
             super({ key: 'Preloader' });
         }
 
         preload() {
+            // Yükleme ekranı öğeleri (progress bar vb.)
             let progressBar = this.add.graphics();
             let progressBox = this.add.graphics();
             progressBox.fillStyle(0x222222, 0.8);
@@ -83,6 +100,7 @@
                 this.scene.start('LobbyScene'); 
             }, this);
 
+            // Resimleri preload et
             this.load.image('lobby_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/lobby_bg.jpg');
             this.load.image('play_button', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/play_button.png');
             this.load.image('score_icon', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/score_icon.png');
@@ -113,20 +131,14 @@
             console.log("Current User:", currentUser); // Debug için ekledim
 
             try {
-                const firebaseConfig = {
-                    apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
-                    authDomain: "peacemissile-game.firebaseapp.com",
-                    projectId: "peacemissile-game",
-                    storageBucket: "peacemissile-game.firebasestorage.app",
-                    messagingSenderId: "641906716058",
-                    appId: "1:641906716058:web:1376e93994fab29f049e23"
-                };
-                if (typeof firebase !== 'undefined') {
+                // Firebase'in zaten başlatılıp başlatılmadığını kontrol et
+                if (!firebase.apps.length) {
                     firebase.initializeApp(firebaseConfig);
                     db = firebase.firestore();
                     console.log("Firebase başlatıldı.");
                 } else {
-                    console.error("Firebase SDK yüklenmedi. Firebase betiklerinin bu betikten önce dahil edildiğinden emin olun.");
+                    db = firebase.firestore();
+                    console.log("Firebase zaten başlatılmış.");
                 }
             } catch (e) {
                 console.error("Firebase başlatma başarısız oldu:", e);
@@ -143,28 +155,38 @@
             const gameWidth = this.cameras.main.width;
             const gameHeight = this.cameras.main.height;
 
+            // Arka planı ekran boyutuna sığdır
             this.add.image(gameWidth / 2, gameHeight / 2, 'lobby_bg').setDisplaySize(gameWidth, gameHeight);
 
+            // "Welcome, Serdar" yazısı - Font boyutunu ekran genişliğine göre ayarla
+            // Font boyutu için daha dinamik bir yaklaşım
+            const welcomeFontSize = Math.max(24, Math.floor(gameWidth * 0.05)); // Minimum 24px, genişliğin %5'i kadar
             this.add.text(gameWidth / 2, gameHeight * 0.15, `Welcome, ${currentUser ? currentUser.first_name : 'Ambassador'}!`, { 
-                fontSize: '38px', // Boyutu küçültüldü
+                fontSize: `${welcomeFontSize}px`, 
                 fill: '#fff', 
                 stroke: '#000', 
                 strokeThickness: 6 
             }).setOrigin(0.5);
 
+            // Play butonu - Ölçeği ekran genişliğine göre ayarla
+            const playButtonScale = Math.min(1.0, gameWidth / this.textures.get('play_button').width * 0.7); // Genişliğin %70'ine kadar sığdır
             const playButton = this.add.image(gameWidth / 2, gameHeight * 0.8, 'play_button')
-                .setScale(0.6) // Boyutu küçültüldü
+                .setScale(playButtonScale) 
                 .setInteractive({ useHandCursor: true });
 
             playButton.on('pointerdown', () => {
                 this.scene.start('GameScene');
             });
 
-            this.add.image(gameWidth / 2 - 100, gameHeight * 0.35, 'score_icon').setScale(0.5); // Boyutu ve Y pozisyonu ayarlandı
-            this.add.image(gameWidth / 2 - 100, gameHeight * 0.45, 'coin_icon').setScale(0.5); // Boyutu ve Y pozisyonu ayarlandı
+            // Skor ve Coin ikonları ve metinleri - Konum ve boyutları orantısal yap
+            const iconScale = Math.min(0.8, gameWidth * 0.0005); // İkon boyutunu dinamik ayarla
+            const textFontSize = Math.max(18, Math.floor(gameWidth * 0.03)); // Metin boyutunu dinamik ayarla
 
-            const highScoreText = this.add.text(gameWidth / 2 + 40, gameHeight * 0.35, `Loading...`, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5); // Boyutu küçültüldü
-            const coinsText = this.add.text(gameWidth / 2 + 40, gameHeight * 0.45, `Loading...`, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5); // Boyutu küçültüldü
+            this.add.image(gameWidth * 0.35, gameHeight * 0.4, 'score_icon').setScale(iconScale); 
+            this.add.image(gameWidth * 0.35, gameHeight * 0.5, 'coin_icon').setScale(iconScale); 
+
+            const highScoreText = this.add.text(gameWidth * 0.6, gameHeight * 0.4, `Loading...`, { fontSize: `${textFontSize}px`, fill: '#fff' }).setOrigin(0.5); 
+            const coinsText = this.add.text(gameWidth * 0.6, gameHeight * 0.5, `Loading...`, { fontSize: `${textFontSize}px`, fill: '#fff' }).setOrigin(0.5); 
 
             if (currentUser && db) {
                 const userDocRef = db.collection('users').doc(String(currentUser.id));
@@ -173,7 +195,7 @@
                         const data = doc.data();
                         highScoreText.setText(`${data.score || 0}`);
                         coinsText.setText(`${data.total_pmno_coins || 0}`);
-                        console.log("Firebase user data loaded:", data); // Debug için ekledim
+                        console.log("Firebase user data loaded:", data); 
                     } else {
                         highScoreText.setText(`0`);
                         coinsText.setText(`0`);
@@ -215,8 +237,8 @@
             this.totalBuildings = 0;
             this.healthBar = null; 
             
-            this.referenceWidth = 1080; 
-            this.referenceHeight = 1920; 
+            this.referenceWidth = 1080; // Tasarım referans genişliği
+            this.referenceHeight = 1920; // Tasarım referans yüksekliği
 
             this.logoPart1 = null;
             this.logoPart2 = null;
@@ -243,36 +265,37 @@
             
             const buildingsData = [];
 
+            // Bina pozisyonlarını ve boyutlarını referans değerlere göre ayarla
             if (this.selectedSide === 'israel') {
                 buildingsData.push({ 
-                    x: (550 / this.referenceWidth) * gameWidth, 
+                    x: 550, 
                     yOffsetFromBottom: 450, 
-                    width: (400 / this.referenceWidth) * gameWidth, 
+                    width: 400, 
                     height: 300 
                 });
                 buildingsData.push({ 
-                    x: (750 / this.referenceWidth) * gameWidth, 
+                    x: 750, 
                     yOffsetFromBottom: 550, 
-                    width: (300 / this.referenceWidth) * gameWidth, 
+                    width: 300, 
                     height: 350 
                 });
                 buildingsData.push({ 
-                    x: (950 / this.referenceWidth) * gameWidth, 
+                    x: 950, 
                     yOffsetFromBottom: 400, 
-                    width: (200 / this.referenceWidth) * gameWidth, 
+                    width: 200, 
                     height: 250 
                 });
             } else { 
                 buildingsData.push({ 
-                    x: (325 / this.referenceWidth) * gameWidth, 
+                    x: 325, 
                     yOffsetFromBottom: 400, 
-                    width: (550 / this.referenceWidth) * gameWidth, 
+                    width: 550, 
                     height: 300 
                 });
                 buildingsData.push({ 
-                    x: (825 / this.referenceWidth) * gameWidth, 
+                    x: 825, 
                     yOffsetFromBottom: 350, 
-                    width: (350 / this.referenceWidth) * gameWidth, 
+                    width: 350, 
                     height: 250 
                 });
             }
@@ -280,24 +303,29 @@
             this.totalBuildings = buildingsData.length;
 
             buildingsData.forEach((data) => {
-                const yPos = gameHeight - (data.yOffsetFromBottom / this.referenceHeight) * gameHeight;
-                const buildingHeight = (data.height / this.referenceHeight) * gameHeight;
+                const scaledX = (data.x / this.referenceWidth) * gameWidth;
+                const scaledYOffsetFromBottom = (data.yOffsetFromBottom / this.referenceHeight) * gameHeight;
+                const scaledWidth = (data.width / this.referenceWidth) * gameWidth;
+                const scaledHeight = (data.height / this.referenceHeight) * gameHeight;
 
-                const buildingBody = this.buildings.create(data.x, yPos, null)
-                    .setSize(data.width, buildingHeight)
+                const yPos = gameHeight - scaledYOffsetFromBottom;
+
+                const buildingBody = this.buildings.create(scaledX, yPos, null)
+                    .setSize(scaledWidth, scaledHeight)
                     .setOrigin(0.5, 0)
                     .setVisible(false) 
                     .refreshBody();
                 
                 buildingBody.buildingHealth = this.maxBuildingHealth;
                 buildingBody.totalHealth = this.maxBuildingHealth; 
-                buildingBody.visualX = data.x; 
-                buildingBody.visualY = yPos + (buildingHeight * 0.5); 
-                buildingBody.visualWidth = data.width; 
-                buildingBody.visualHeight = buildingHeight; 
+                buildingBody.visualX = scaledX; 
+                buildingBody.visualY = yPos + (scaledHeight * 0.5); 
+                buildingBody.visualWidth = scaledWidth; 
+                buildingBody.visualHeight = scaledHeight; 
             });
 
-            this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
+            const scoreTextFontSize = Math.max(24, Math.floor(gameWidth * 0.04)); // Dinamik font boyutu
+            this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: `${scoreTextFontSize}px`, fill: '#fff', stroke: '#000', strokeThickness: 4 });
             this.healthBar = this.add.graphics();
             this.updateHealthBar(); 
 
@@ -319,8 +347,8 @@
             const gameWidth = this.cameras.main.width;
             const scoreTextBounds = this.scoreText.getBounds(); 
 
-            const healthBarWidth = 200;
-            const healthBarHeight = 30;
+            const healthBarWidth = gameWidth * 0.3; // Genişliğin %30'u
+            const healthBarHeight = gameWidth * 0.04; // Genişliğin %4'ü
             const healthBarX = 16; 
             const healthBarY = scoreTextBounds.bottom + 10; 
 
@@ -521,7 +549,7 @@
                 const ease = 'Power2';
 
                 const newHighScoreTextStyle = {
-                    fontSize: "36px", 
+                    fontSize: `${Math.max(30, Math.floor(gameWidth * 0.06))}px`, // Dinamik font boyutu
                     fill: "#FFD700", 
                     align: "center",
                     stroke: '#000', 
@@ -555,13 +583,19 @@
                         this.logoPart4.setVisible(false);
                         this.fullLogo.setVisible(true).setPosition(centerX, centerY).setScale(fullLogoScale); 
 
-                        this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * fullLogoScale) / 2 + 50, "New Score!\n: " + this.score, newHighScoreTextStyle).setOrigin(0.5); 
+                        // Dinamik metin konumu
+                        const logoHeight = this.textures.get('full_logo').getSourceImage().height * fullLogoScale;
+                        this.add.text(centerX, centerY + logoHeight / 2 + (gameHeight * 0.03), "New Score!\n" + this.score, newHighScoreTextStyle).setOrigin(0.5); 
                         
                         this.time.delayedCall(4000, () => this.scene.start('LobbyScene')); 
                     }
                 });
             } else {
-                this.add.text(centerX, centerY, "Game Over\nScore: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
+                this.add.text(centerX, centerY, "Game Over\nScore: " + this.score, { 
+                    fontSize: `${Math.max(36, Math.floor(gameWidth * 0.08))}px`, // Dinamik font boyutu
+                    fill: "#ff0000", 
+                    align: "center" 
+                }).setOrigin(0.5);
                 this.time.delayedCall(4000, () => this.scene.start('LobbyScene')); 
             }
         }
@@ -576,6 +610,7 @@
             const userDocRef = db.collection('users').doc(String(currentUser.id));
 
             try {
+                console.log("Attempting to save score for user:", currentUser.id, "Score:", score);
                 const doc = await userDocRef.get();
                 let currentHighScore = 0;
                 let totalCoins = 0;
@@ -585,6 +620,9 @@
                     const data = doc.data();
                     currentHighScore = data.score || 0;
                     totalCoins = data.total_pmno_coins || 0;
+                    console.log("Existing user data:", data);
+                } else {
+                    console.log("User document does not exist. Initializing with default values.");
                 }
 
                 let isNewHighScore = false;
@@ -596,15 +634,17 @@
                     isNewHighScore = true;
                     updateData.score = score; 
                     updateData.total_pmno_coins = firebase.firestore.FieldValue.increment(score + (100 * score)); 
+                    console.log(`New High Score! Score: ${score}, Old High Score: ${currentHighScore}. Coins to add: ${score + (100 * score)}`);
                 } else {
                     updateData.total_pmno_coins = firebase.firestore.FieldValue.increment(score); 
+                    console.log(`Not a New High Score. Score: ${score}. Coins to add: ${score}`);
                 }
 
                 updateData.username = username;
                 updateData.user_id = currentUser.id;
 
                 await userDocRef.set(updateData, { merge: true });
-                console.log("Skor ve coinler Firebase'e kaydedildi/güncellendi.");
+                console.log("Skor ve coinler Firebase'e başarıyla kaydedildi/güncellendi. Güncellenen veriler:", updateData);
                 sendScoreToBot(currentUser.id, score); 
                 if (callback) callback(isNewHighScore);
 
@@ -631,6 +671,7 @@
 
     const config = { 
         type: Phaser.AUTO, 
+        // Genişlik ve yüksekliği dinamik olarak belirle
         width: window.innerWidth, 
         height: window.innerHeight, 
         physics: { 
@@ -639,7 +680,11 @@
                 gravity: { y: 0 } 
             } 
         }, 
-        scene: [Preloader, LobbyScene, GameScene] 
+        scene: [Preloader, LobbyScene, GameScene],
+        scale: {
+            mode: Phaser.Scale.FIT, // Oyunu ekranı kaplayacak şekilde ölçekle, en boy oranını koru
+            autoCenter: Phaser.Scale.CENTER_BOTH // Hem yatay hem dikey olarak ortala
+        }
     };
 
     function startGame() {
@@ -653,6 +698,18 @@
     }
 
     window.addEventListener('load', startGame);
+    window.addEventListener('resize', () => {
+        if (game) {
+            game.scale.resize(window.innerWidth, window.innerHeight);
+            game.canvas.style.width = window.innerWidth + 'px';
+            game.canvas.style.height = window.innerHeight + 'px';
+            game.scene.scenes.forEach(scene => {
+                if (scene.cameras && scene.cameras.main) {
+                    scene.cameras.main.setSize(window.innerWidth, window.innerHeight);
+                }
+            });
+        }
+    });
 
 </script>
 </body>
