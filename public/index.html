@@ -1,647 +1,483 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Peace Missile Game</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-        <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } canvas { display: block; } </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Peace Missile Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } canvas { display: block; } </style>
 </head>
 <body>
 <div id="phaser-game"></div>
 <script type="text/javascript">
-    const tg = window.Telegram.WebApp;
-    const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
-    let db; // Firebase veritabanı nesnesi
-    // let userWalletAddress = null; // Cüzdan bağlantısı gizlendiği için şimdilik devre dışı bırakıldı
-
-    try {
-        const firebaseConfig = {
-            apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
-            authDomain: "peacemissile-game.firebaseapp.com",
-            projectId: "peacemissile-game",
-            storageBucket: "peacemissile-game.firebasestorage.app",
-            messagingSenderId: "641906716058",
-            appId: "1:641906716058:web:1376e93994fab29f049e23"
-        };
-        if (typeof firebase !== 'undefined') {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-        } else {
-            console.error("Firebase SDK yüklenmedi. Firebase betiklerinin bu betikten önce dahil edildiğinden emin olun.");
-        }
-    } catch (e) {
-        console.error("Firebase başlatma başarısız oldu:", e);
-    }
-
-    class GameScene extends Phaser.Scene {
-        constructor() {
-            super({ key: 'GameScene' });
-            this.score = 0;
-            this.gameIsOver = false;
-            this.gameTime = 0;
-            this.maxBuildingHealth = 3; 
-            this.buildingsDestroyed = 0;
-            this.totalBuildings = 0;
-            this.healthBar = null; 
-            // this.connectWalletButton = null; // Cüzdan bağlantısı gizlendiği için devre dışı bırakıldı
-            // this.walletAddressText = null; // Cüzdan bağlantısı gizlendiği için devre dışı bırakıldı
-
-            this.referenceWidth = 1080; // Görselin referans genişliği
-            this.referenceHeight = 1920; // Görselin referans yüksekliği
-
-            // Logo parçaları referansları
-            this.logoPart1 = null;
-            this.logoPart2 = null;
-            this.logoPart3 = null;
-            this.logoPart4 = null;
-            this.fullLogo = null;
-        }
-
-        preload() {
-            const urlParams = new URLSearchParams(window.location.search);
-            this.selectedSide = urlParams.get('side') || 'israel';
-            
-            // Görselleri doğrudan GitHub linklerinden yükle
-            const bgUrl = this.selectedSide === 'iran' 
-                ? 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/iran_bg.jpg' 
-                : 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/israel_bg.jpg';
-            this.load.image('background', bgUrl);
-
-            this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
-            this.load.image('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif');
-            this.load.image('destroyed_building', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/destroyed_building.png'); 
-            this.load.image('dove', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/dove.png'); 
-           
-            // Logo parçalarını yükle (isimler ekran görüntüsüne göre)
-            this.load.image('logo_part_1', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_1.png');
-            this.load.image('logo_part_2', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_2.png');
-            this.load.image('logo_part_3', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_3.png');
-            this.load.image('logo_part_4', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo_part_4.png');
-            this.load.image('full_logo', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo.png'); 
-        }
-
-        create() {
-            const gameWidth = this.cameras.main.width;
-            const gameHeight = this.cameras.main.height;
-
-            // Arka planı ekran boyutuna göre ayarla
-            let bg = this.add.image(gameWidth / 2, gameHeight / 2, 'background');
-            bg.setDisplaySize(gameWidth, gameHeight);
-
-            this.buildings = this.physics.add.staticGroup();
-            this.destroyedBuildingSprites = this.add.group(); 
-            
-            const buildingsData = [];
-
-            // Bina koordinatları ve boyutları (referans çözünürlüğe göre oranlı)
-            // Y pozisyonları, binanın en üst pikselinden (veya çatısından) itibaren.
-            // Height ise bu üst noktadan aşağıya doğru kutunun yüksekliği.
-            if (this.selectedSide === 'israel') {
-                buildingsData.push({ 
-                    x: (550 / this.referenceWidth) * gameWidth, 
-                    yOffsetFromBottom: 450, 
-                    width: (400 / this.referenceWidth) * gameWidth, 
-                    height: 300 
-                });
-                buildingsData.push({ 
-                    x: (750 / this.referenceWidth) * gameWidth, 
-                    yOffsetFromBottom: 550, 
-                    width: (300 / this.referenceWidth) * gameWidth, 
-                    height: 350 
-                });
-                buildingsData.push({ 
-                    x: (950 / this.referenceWidth) * gameWidth, 
-                    yOffsetFromBottom: 400, 
-                    width: (200 / this.referenceWidth) * gameWidth, 
-                    height: 250 
-                });
-            } else { // iran
-                buildingsData.push({ 
-                    x: (325 / this.referenceWidth) * gameWidth, 
-                    yOffsetFromBottom: 400, 
-                    width: (550 / this.referenceWidth) * gameWidth, 
-                    height: 300 
-                });
-                buildingsData.push({ 
-                    x: (825 / this.referenceWidth) * gameWidth, 
-                    yOffsetFromBottom: 350, 
-                    width: (350 / this.referenceWidth) * gameWidth, 
-                    height: 250 
-                });
-            }
-
-            this.totalBuildings = buildingsData.length;
-
-            buildingsData.forEach((data) => {
-                // Y koordinatını ekranın altından yOffsetFromBottom kadar yukarıya ayarla
-                const yPos = gameHeight - (data.yOffsetFromBottom / this.referenceHeight) * gameHeight;
-                const buildingHeight = (data.height / this.referenceHeight) * gameHeight;
-
-                const buildingBody = this.buildings.create(data.x, yPos, null)
-                    .setSize(data.width, buildingHeight)
-                    .setOrigin(0.5, 0) // Üst ortaya hizala
-                    .setVisible(false) 
-                    .refreshBody();
-                
-                buildingBody.buildingHealth = this.maxBuildingHealth;
-                buildingBody.totalHealth = this.maxBuildingHealth; 
-                buildingBody.visualX = data.x; 
-                buildingBody.visualY = yPos + (buildingHeight * 0.5); // Kraterin binanın orta seviyesine denk gelmesi için
-                buildingBody.visualWidth = data.width; 
-                buildingBody.visualHeight = buildingHeight; 
-            });
-
-            this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
-            this.healthBar = this.add.graphics();
-            this.updateHealthBar(); // İlk sağlık çubuğunu çiz
-
-            // Metamask Cüzdan Bağla Düğmesi ve Cüzdan Adresi Metni Şimdilik Gizlendi
-            /*
-            this.connectWalletButton = this.add.text(gameWidth - 16, 16, 'Cüzdan Bağla', { 
-                fontSize: '24px', 
-                fill: '#fff', 
-                backgroundColor: '#f6851b', 
-                padding: { x: 10, y: 5 }
-            })
-            .setOrigin(1, 0)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => this.connectMetamask());
-
-            this.walletAddressText = this.add.text(gameWidth - 16, 60, 'Cüzdan: Bağlı Değil', { 
-                fontSize: '16px', 
-                fill: '#fff', 
-                stroke: '#000', 
-                strokeThickness: 2 
-            })
-            .setOrigin(1, 0);
-
-            if (userWalletAddress) {
-                this.updateWalletAddressText(userWalletAddress);
-            } else {
-                 this.checkExistingWalletAddress();
-            }
-            */
-
-            this.rockets = this.physics.add.group();
-            this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this);
-            
-            this.time.addEvent({ delay: 1500, callback: this.spawnRocket, callbackScope: this, loop: true });
-            this.time.addEvent({ delay: 1000, callback: this.increaseGameTime, callbackScope: this, loop: true });
-
-            // Logo parçalarını ve tam logoyu (opsiyonel) oluştur ve gizle
-            const logoScale = 0.25; // Başlangıç ölçeği, gerekirse ayarla
-            const fullLogoScale = 0.5; // Tam logo ölçeği, gerekirse ayarla
-
-            this.logoPart1 = this.add.image(0, 0, 'logo_part_1').setVisible(false).setScale(logoScale);
-            this.logoPart2 = this.add.image(0, 0, 'logo_part_2').setVisible(false).setScale(logoScale);
-            this.logoPart3 = this.add.image(0, 0, 'logo_part_3').setVisible(false).setScale(logoScale);
-            this.logoPart4 = this.add.image(0, 0, 'logo_part_4').setVisible(false).setScale(logoScale);
-            this.fullLogo = this.add.image(gameWidth / 2, gameHeight / 2, 'full_logo').setVisible(false).setScale(fullLogoScale); // Opsiyonel
-        }
-
-        updateHealthBar() {
-            this.healthBar.clear();
-            const gameWidth = this.cameras.main.width;
-            const scoreTextBounds = this.scoreText.getBounds(); 
-
-            const healthBarWidth = 200;
-            const healthBarHeight = 30;
-            const healthBarX = 16; 
-            const healthBarY = scoreTextBounds.bottom + 10; 
-
-            let totalCurrentHealth = 0;
-            this.buildings.children.each(b => {
-                totalCurrentHealth += b.buildingHealth;
-            });
-            const totalMaxHealth = this.totalBuildings * this.maxBuildingHealth;
-            const healthRatio = totalCurrentHealth / totalMaxHealth;
-
-            this.healthBar.fillStyle(0x000000, 0.7); 
-            this.healthBar.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
-
-            this.healthBar.fillStyle(0x00FF00); 
-            if (healthRatio < 0.5) {
-                this.healthBar.fillStyle(0xFFFF00); 
-            }
-            if (healthRatio < 0.25) {
-                this.healthBar.fillStyle(0xFF0000); 
-            }
-            this.healthBar.fillRect(healthBarX, healthBarY, healthBarWidth * healthRatio, healthBarHeight);
-
-            this.healthBar.lineStyle(2, 0xFFFFFF); 
-            this.healthBar.strokeRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
-        }
-
-        increaseGameTime() {
-            this.gameTime++;
-        }
-
-        // Cüzdan bağlantısı işlevleri şimdilik devre dışı bırakıldı
-        /*
-        async connectMetamask() {
-            if (typeof window.ethereum !== 'undefined' && typeof ethers !== 'undefined') {
-                try {
-                    const provider = new ethers.providers.Web3Provider(window.ethereum);
-                    const accounts = await provider.send("eth_requestAccounts", []);
-                    const address = accounts.length > 0 ? accounts[0] : null;
-                    
-                    if (address) {
-                        userWalletAddress = address;
-                        this.updateWalletAddressText(address);
-                        this.saveWalletAddress(address);
-                        console.log("Metamask bağlandı:", address);
-
-                        window.ethereum.on('accountsChanged', (newAccounts) => {
-                            const newAddress = newAccounts.length > 0 ? newAccounts[0] : null;
-                            if (newAddress) {
-                                userWalletAddress = newAddress;
-                                this.updateWalletAddressText(newAddress);
-                                this.saveWalletAddress(newAddress);
-                                console.log("Metamask hesabı değiştirildi:", newAddress);
-                            } else {
-                                userWalletAddress = null;
-                                this.updateWalletAddressText("Bağlı Değil");
-                                console.log("Metamask hesabı bağlantısı kesildi.");
-                            }
-                        });
-                    } else {
-                        this.walletAddressText.setText("Bağlantı reddedildi!");
-                    }
-
-
-                } catch (error) {
-                    console.error("Metamask bağlanırken hata:", error);
-                    this.walletAddressText.setText("Bağlantı iptal edildi/hata!");
-                }
-            } else {
-                this.walletAddressText.setText("Metamask kurulu değil!");
-                console.warn("Metamask veya Ethers.js kurulu değil. Lütfen tarayıcınıza Metamask'ı yükleyin ve sayfayı yenileyin.");
-            }
-        }
-
-        updateWalletAddressText(address) {
-            if (address && address !== "Bağlı Değil") {
-                const shortAddress = address.substring(0, 6) + '...' + address.substring(address.length - 4);
-                this.walletAddressText.setText(`Cüzdan: ${shortAddress}`);
-                if (this.connectWalletButton) {
-                    this.connectWalletButton.setVisible(false);
-                }
-            } else {
-                this.walletAddressText.setText("Cüzdan: Bağlı Değil");
-                if (this.connectWalletButton) {
-                    this.connectWalletButton.setVisible(true);
-                }
-            }
-        }
-
-        async saveWalletAddress(address) {
-            if (!db || !currentUser || !currentUser.id) {
-                console.warn("Firebase veya kullanıcı bilgisi mevcut değil, cüzdan adresi kaydedilemiyor.");
-                return;
-            }
-
-            const userDocRef = db.collection('users').doc(String(currentUser.id));
-            try {
-                await userDocRef.set({ 
-                    walletAddress: address 
-                }, { merge: true });
-                console.log("Cüzdan adresi Firebase'e kaydedildi.");
-            } catch (error) {
-                console.error("Cüzdan adresi kaydederken hata:", error);
-            }
-        }
-
-        async checkExistingWalletAddress() {
-            if (!db || !currentUser || !currentUser.id) return;
-
-            const userDocRef = db.collection('users').doc(String(currentUser.id));
-            try {
-                const doc = await userDocRef.get();
-                if (doc.exists && doc.data().walletAddress) {
-                    userWalletAddress = doc.data().walletAddress;
-                    this.updateWalletAddressText(userWalletAddress);
-                    console.log("Mevcut cüzdan adresi yüklendi:", userWalletAddress);
-                }
-            } catch (error) {
-                console.error("Mevcut cüzdan adresini kontrol ederken hata:", error);
-            }
-        }
-        */
-
-        spawnRocket() {
-            if (this.gameIsOver) return;
-
-            const gameWidth = this.cameras.main.width;
-            const gameHeight = this.cameras.main.height;
-
-            let startX, startY, velocityX, velocityY, angle;
-            let spawnType = Phaser.Math.Between(0, 100); 
-
-            let baseSpeed = 150 + (this.gameTime * 2);
-            let maxSpeed = 400 + (this.gameTime * 5);
-            if (baseSpeed > 600) baseSpeed = 600;
-            if (maxSpeed > 800) maxSpeed = 800;
-
-            let buildingDamageBonus = this.buildingsDestroyed * 50; 
-            baseSpeed += buildingDamageBonus;
-            maxSpeed += buildingDamageBonus;
-
-            const activeBuildings = this.buildings.children.entries.filter(b => b.body.enable);
-            let targetBuilding = null;
-            if (activeBuildings.length > 0) {
-                targetBuilding = Phaser.Utils.Array.GetRandom(activeBuildings);
-            }
-            
-            let targetX, targetY;
-            if (targetBuilding) {
-                targetX = targetBuilding.x + Phaser.Math.Between(-targetBuilding.body.width / 4, targetBuilding.body.width / 4);
-                targetY = targetBuilding.y + Phaser.Math.Between(0, targetBuilding.body.height / 3); 
-            } else {
-                targetX = gameWidth / 2;
-                targetY = gameHeight * 0.8;
-            }
-
-
-            if (this.gameTime < 10 || spawnType < 70) {
-                startX = Phaser.Math.Between(40, gameWidth - 40);
-                startY = -100;
-                
-                const angleToTarget = Phaser.Math.Angle.Between(startX, startY, targetX, targetY);
-                const speed = Phaser.Math.Between(baseSpeed, maxSpeed);
-                velocityX = Math.cos(angleToTarget) * speed;
-                velocityY = Math.sin(angleToTarget) * speed;
-                angle = Phaser.Math.RadToDeg(angleToTarget) + 90; 
-            } else {
-                let side = Phaser.Math.Between(0, 1) === 0 ? 'left' : 'right';
-
-                if (side === 'left') {
-                    startX = -100;
-                    startY = Phaser.Math.Between(gameHeight * 0.3, gameHeight * 0.7); 
-                    
-                    const angleToTarget = Phaser.Math.Angle.Between(startX, startY, targetX, targetY);
-                    const speed = Phaser.Math.Between(baseSpeed, maxSpeed);
-                    velocityX = Math.cos(angleToTarget) * speed;
-                    velocityY = Math.sin(angleToTarget) * speed;
-                    angle = Phaser.Math.RadToDeg(angleToTarget) + 90;
-                } else { 
-                    startX = gameWidth + 100;
-                    startY = Phaser.Math.Between(gameHeight * 0.3, gameHeight * 0.7);
-                    
-                    const angleToTarget = Phaser.Math.Angle.Between(startX, startY, targetX, targetY);
-                    const speed = Phaser.Math.Between(baseSpeed, maxSpeed);
-                    velocityX = Math.cos(angleToTarget) * speed;
-                    velocityY = Math.sin(angleToTarget) * speed;
-                    angle = Phaser.Math.RadToDeg(angleToTarget) + 90;
-                }
-            }
-
-            const rocket = this.rockets.create(startX, startY, "rocket");
-            rocket.setAngle(angle);
-            rocket.setVelocity(velocityX, velocityY);
-            rocket.setInteractive({ useHandCursor: true });
-            rocket.on("pointerdown", () => this.destroyRocket(rocket));
-
-            rocket.setCollideWorldBounds(false);
-            rocket.body.onWorldBounds = true;
-            this.physics.world.on('worldbounds', (body) => {
-                if (body.gameObject === rocket && !this.gameIsOver) {
-                    rocket.destroy();
-                }
-            }, this);
-        }
-
-        destroyRocket(rocket) {
-            if (!rocket.active || this.gameIsOver) return;
-
-            this.score += 10;
-            this.scoreText.setText("Score: " + this.score);
-
-            // Patlama efekti (2 katı büyüklük)
-            const explosion = this.add.image(rocket.x, rocket.y, "explosion").setScale(1.5); 
-            this.time.delayedCall(150, () => explosion.destroy());
-
-            // Güvercin efekti (2 katı büyüklük)
-            const dove = this.add.image(rocket.x, rocket.y, 'dove').setScale(0.4); 
-            this.tweens.add({
-                targets: dove,
-                y: dove.y - 100, // Yukarı doğru uçuş efekti
-                alpha: 0, // Yavaşça kaybolma
-                duration: 1000,
-                ease: 'Power1',
-                onComplete: () => {
-                    dove.destroy();
-                }
-            });
-
-            rocket.destroy();
-        }
-
-        hitBuilding(rocket, building) {
-            if (!rocket.active || !building.body.enable || this.gameIsOver) return;
-
-            building.buildingHealth--; 
-            
-            window.Telegram && window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");
-
-            const explosion = this.add.image(rocket.x, rocket.y + 20, "explosion").setScale(1.2).setTint(0xFF0000);
-            this.time.delayedCall(300, () => explosion.destroy());
-            this.cameras.main.shake(200, 0.02);
-
-            rocket.destroy(); 
-
-            if (building.buildingHealth <= 0) {
-                this.buildingsDestroyed++;
-                building.body.enable = false; 
-                building.setVisible(false); 
-
-                const destroyedSprite = this.add.image(building.visualX, building.visualY, 'destroyed_building');
-                destroyedSprite.setOrigin(0.5, 0.5); 
-                
-                // Krateri binanın fiziksel kutusuna göre ölçekle ve %100 daha büyük yap (2 katı)
-                // building.visualWidth ve building.visualHeight, çarpışma kutusunun oranlanmış boyutlarıdır.
-                // destroyedSprite.width ve destroyedSprite.height, yüklenen destroyed_building.png'nin orijinal piksel boyutlarıdır.
-                const originalScaleFactor = Math.min(building.visualWidth / destroyedSprite.width, building.visualHeight / destroyedSprite.height);
-                const newScaleFactor = originalScaleFactor * 2.0; // %100 daha büyük = 2 katı
-                destroyedSprite.setScale(newScaleFactor); 
-                this.destroyedBuildingSprites.add(destroyedSprite);
-
-                const finalExplosion = this.add.image(building.visualX, building.visualY, "explosion").setScale(2).setTint(0x800000);
-                this.time.delayedCall(500, () => finalExplosion.destroy());
-            }
-
-            this.updateHealthBar(); 
-
-            // Tüm binalar yok edildiğinde oyunu bitir
-            if (this.buildingsDestroyed >= this.totalBuildings) {
-                saveScore(this.score, (isNewHighScore) => {
-                    this.gameOver(isNewHighScore);
-                });
-            }
-        }
-
-        gameOver(isNewHighScore = false) {
-            if (this.gameIsOver) return;
-            this.gameIsOver = true;
-            this.physics.pause();
-            window.Telegram && window.Telegram.WebApp.HapticFeedback.notificationOccurred("success"); // Oyun bitiminde başarı titreşimi
-
-            this.rockets.children.each(rocket => rocket.destroy());
-            
-            const gameWidth = this.cameras.main.width;
-            const gameHeight = this.cameras.main.height;
-            const centerX = gameWidth / 2;
-            const centerY = gameHeight / 2;
-
-            this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0x000000, 0.1);
-            
-            if (isNewHighScore) {
-                const logoStartScale = 0.4; // Başlangıç ölçeği (önceki 0.3'ten artırıldı)
-                const logoTargetScale = 0.8; // Hedef ölçeği (önceki 0.6'dan artırıldı)
-                const fullLogoScale = 0.9; // Tam logo ölçeği (önceki 0.7'den artırıldı)
-
-                 // Logo parçalarını daha yavaş birleştirmek için tween süresini artırdık (1500'den 2500'e)
-                const tweenDuration = 2500; // Burası değiştirildi: 1500 -> 2500
-                const ease = 'Power2';
-
-                // "YENİ YÜKSEK SKOR!" yazısının rengini ve font boyutunu değiştirdik
-                const newHighScoreTextStyle = {
-                    fontSize: "36px", // Önceki "40px"ten "36px"e düşürüldü (daha küçük)
-                    fill: "#FFD700", // Altın rengi (daha parlak ve dikkat çekici)
-                    align: "center",
-                    stroke: '#000', // Kontur ekleyelim, daha belirgin olur
-                    strokeThickness: 6
-                };
-
-                // Logo parçalarını merkeze doğru hareket ettirmek için başlangıç pozisyonları
-               const startOffset = Math.max(gameWidth, gameHeight); // Köşelerden gelmesi için yeterli uzaklık
-
-                this.logoPart1.setPosition(centerX - startOffset, centerY - startOffset).setVisible(true).setScale(logoStartScale);
-                this.logoPart2.setPosition(centerX + startOffset, centerY - startOffset).setVisible(true).setScale(logoStartScale);
-                this.logoPart3.setPosition(centerX - startOffset, centerY + startOffset).setVisible(true).setScale(logoStartScale);
-                this.logoPart4.setPosition(centerX + startOffset, centerY + startOffset).setVisible(true).setScale(logoStartScale);
-
-                // Hedef pozisyonlar (birleşmiş logonun merkezini hedef alarak)
-                const fullLogoOriginalWidth = this.textures.get('full_logo').getSourceImage().width;
-                const fullLogoOriginalHeight = this.textures.get('full_logo').getSourceImage().height;
-                
-                
-                // Her parçanın tam logodaki yerine göre merkezden orantılı ofsetini hesapla
-                // Bu değerleri logo.png'ye bakarak manuel olarak ayarlamanız gerekebilir.
-                // Örneğin: logo_part_1 tam logonun sol üst kısmını temsil ediyorsa,
-                // fullLogoOriginalWidth / 4 ve fullLogoOriginalHeight / 4 gibi değerler kullanılabilir.
-                // Bu örnekte, parçaların hedeflerini daha merkezi yapıyoruz ve scale ile oynayarak büyütme sağlıyoruz.
-                const offsetFactorX =gameWidth  * 0.1; // Yatayda merkeze yaklaşma oranı
-                const offsetFactorY = gameHeight  * 0.07; // Dikeyde merkeze yaklaşma oranı
-
-                this.tweens.add({ targets: this.logoPart1, x: centerX -  offsetFactorX, y: centerY -  offsetFactorY, scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
-                this.tweens.add({ targets: this.logoPart2, x: centerX + offsetFactorX, y: centerY -  offsetFactorY, scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
-                this.tweens.add({ targets: this.logoPart3, x: centerX - offsetFactorX, y: centerY +  offsetFactorY, scale: logoTargetScale, duration: tweenDuration, ease: ease }); // Scale animasyona eklendi
-                this.tweens.add({
-                    targets: this.logoPart4,
-                    x: centerX +  offsetFactorX,
-                    y: centerY + offsetFactorY,
-                    scale: logoTargetScale, // Scale animasyona eklendi
-                    duration: tweenDuration,
-                    ease: ease,
-                    onComplete: () => {
-                        // Tüm parçalar yerine ulaştığında, tam logoyu göster ve parçaları gizle
-                        this.logoPart1.setVisible(false);
-                        this.logoPart2.setVisible(false);
-                        this.logoPart3.setVisible(false);
-                        this.logoPart4.setVisible(false);
-                        this.fullLogo.setVisible(true).setPosition(centerX, centerY).setScale(fullLogoScale); // Tam logoyu göster
-
-                        this.add.text(centerX, centerY + (this.textures.get('full_logo').getSourceImage().height * fullLogoScale) / 2 + 50, "New Score!\n: " + this.score, newHighScoreTextStyle).setOrigin(0.5); // Yeni stil kullanıldı
-                        
-                        // Kapanma süresini 5 saniye daha uzattık (4000 + 5000 = 9000 ms)
-                        window.Telegram && window.Telegram.WebApp && this.time.delayedCall(9000, () => window.Telegram.WebApp.close()); // Burası değiştirildi: 4000 -> 9000
-                    }
-                });
-            } else {
-                this.add.text(centerX, centerY, "Game Over\n: " + this.score, { fontSize: "48px", fill: "#ff0000", align: "center" }).setOrigin(0.5);
-                // Kapanma süresini 5 saniye daha uzattık (4000 + 5000 = 9000 ms)
-                window.Telegram && window.Telegram.WebApp && this.time.delayedCall(9000, () => window.Telegram.WebApp.close()); // Burası değiştirildi: 4000 -> 9000
-              }
-        }
-    }
-
-    // New function to send data to the bot
-    function sendScoreToBot(userId, score) {
-        if (window.Telegram && window.Telegram.WebApp) {
-            const dataToSend = {
-                user_id: userId,
-                score: score
-            };
-            try {
-                // Send data as a JSON string
-                window.Telegram.WebApp.sendData(JSON.stringify(dataToSend));
-                console.log("Score sent to Telegram bot:", dataToSend);
-            } catch (error) {
-                console.error("Failed to send score to Telegram bot:", error);
-            }
-        } else {
-            console.warn("Telegram WebApp object not found. Cannot send score to bot.");
-        }
-    }
-
-    function saveScore(score, callback) {
-           if (!db || !currentUser || !currentUser.id) {
-        console.warn("Firebase veya kullanıcı bilgisi mevcut değil, skor kaydedilemiyor.");
-        if (callback) callback(false);
-        return;
-    }
-
-        const userDocRef = db.collection('users').doc(String(currentUser.id));
-
-        // Mevcut skoru oku ve daha yüksekse güncelle
-        userDocRef.get().then((doc) => {
-            let currentHighScore = 0;
-            if (doc.exists && doc.data().score) {
-                currentHighScore = doc.data().score;
-            }
-
-            let isNewHighScore = false;
-            if (score > currentHighScore) {
-                isNewHighScore = true;
-                userDocRef.set({ 
-                    score: score, 
-                    username: currentUser.username || currentUser.first_name || `User${currentUser.id}` 
-                }, { merge: true }) 
-                .then(() => {
-                    console.log("New Score:", score);
-                    sendScoreToBot(currentUser.id, score); // Added this line
-                    if (callback) callback(isNewHighScore);
-                })
-                .catch(err => {
-                    console.error("Yüksek skor kaydetme hatası:", err);
-                    if (callback) callback(false); // Hata durumunda da callback'i çağır
-                });
-            } else {
-                console.log("Yeni skor, mevcut yüksek skordan daha düşük veya eşit. Kaydedilmedi.");
-                if (callback) callback(isNewHighScore);
-            }
-        }).catch(err => {
-            console.error("Skor okuma hatası:", err);
-            // Okuma hatası durumunda bile deneme amaçlı kaydetme (yeni yüksek skor olmasa bile)
-            userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` }, { merge: true })
-                .then(() => {
-                    console.log("İlk skor veya hata sonrası skor kaydedildi (fallback):", score);
-                    sendScoreToBot(currentUser.id, score); // Added this line
-                    if (callback) callback(true); // Hata durumunda kaydedildiği için yeni yüksek skor olduğunu varsayabiliriz
-                })
-                .catch(e => {
-                    console.error("Skor kaydetme hatası (fallback):", e);
-                    if (callback) callback(false);
-                });
-        });
-    }
-
-    const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade', arcade: { gravity: { y: 0 } } }, scene: GameScene };
-    try { const game = new Phaser.Game(config); } catch (e) { document.body.innerHTML = `<h1 style="color:red;">HATA: ${e.message}</h1>`; }
+    const tg = window.Telegram.WebApp;
+    const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
+    
+    // Firebase ile ilgili değişken ve fonksiyonları bu dosyadan kaldırıyorum.
+    // let db; // Firebase veritabanı referansı
+
+    // Firebase'i burada başlatmaya gerek yok, bot.py yönetecek.
+    /*
+    try {
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY", // Buraya kendi Firebase API anahtarınızı girin
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "peacemissile-game",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        if (!firebase_admin.apps.length) { // firebase_admin değil, firebase!
+            firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.firestore();
+        console.log("Firebase initialized (client-side).");
+    } catch (e) {
+        console.error("Error initializing Firebase (client-side):", e);
+    }
+    */
+
+    // Yeni: Skoru bota gönderen fonksiyon
+    function sendScoreToBot(finalScore) {
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+            const userId = window.Telegram.WebApp.initDataUnsafe.user.id.toString();
+            const dataToSend = {
+                user_id: userId,
+                final_score: finalScore
+            };
+
+            console.log("Skor bota gönderiliyor:", dataToSend);
+            window.Telegram.WebApp.sendData(JSON.stringify(dataToSend));
+            window.Telegram.WebApp.close(); // İsteğe bağlı: Oyun penceresini kapat
+
+        } else {
+            console.error("Telegram WebApp başlatılmamış veya kullanıcı bilgisi yok. Skor bota gönderilemedi.");
+            // Geliştirme ortamında test ediyorsanız bu mesajı görebilirsiniz.
+            // Canlıda, bu durumda skoru kaydetme işlemi gerçekleşmez.
+        }
+    }
+
+
+    // Eski saveScore fonksiyonu kaldırıldı veya yerine sendScoreToBot çağrısı eklendi.
+    // Fonksiyonun ismiyle ilgili problem vardı, çünkü bu fonksiyon sadece Firebase'e kaydetmeye çalışıyordu.
+    // Bu fonksiyona artık ihtiyacınız yok, çünkü botunuza göndereceksiniz.
+    /*
+    function saveScore(score, callback) {
+        if (!currentUser) {
+            console.error("Kullanıcı bilgisi yok, skor kaydedilemez.");
+            if (callback) callback(false);
+            return;
+        }
+
+        const userDocRef = db.collection('users').doc(currentUser.id.toString());
+
+        userDocRef.get().then(doc => {
+            let currentHighScore = 0;
+            if (doc.exists) {
+                currentHighScore = doc.data().score || 0;
+            }
+
+            let isNewHighScore = score > currentHighScore;
+
+            if (isNewHighScore) {
+                console.log("Yeni yüksek skor:", score);
+                userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` }, { merge: true })
+                    .then(() => {
+                        console.log("Skor Firebase'e başarıyla kaydedildi.");
+                        if (callback) callback(true);
+                    })
+                    .catch(err => {
+                        console.error("Skor kaydetme hatası:", err);
+                        if (callback) callback(false); // Hata durumunda da callback'i çağır
+                    });
+            } else {
+                console.log("Yeni skor, mevcut yüksek skordan daha düşük veya eşit. Kaydedilmedi.");
+                if (callback) callback(isNewHighScore);
+            }
+        }).catch(err => {
+            console.error("Skor okuma hatası:", err);
+            // Okuma hatası durumunda bile deneme amaçlı kaydetme (yeni yüksek skor olmasa bile)
+            userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` }, { merge: true })
+                .then(() => {
+                    console.log("İlk skor veya hata sonrası skor başarıyla kaydedildi.");
+                    if (callback) callback(true);
+                })
+                .catch(err => {
+                    console.error("Hata sonrası skor kaydetme hatası:", err);
+                    if (callback) callback(false);
+                });
+        });
+    }
+    */
+
+
+    // --- GAME SCENES ---
+
+    // Boot Scene
+    class BootScene extends Phaser.Scene {
+        constructor() {
+            super('BootScene');
+        }
+        preload() {
+            // Placeholder for loading assets
+            this.load.image('preload_bg', 'https://peacemissile-game.onrender.com/public/assets/preload_bg.png'); // Arka plan
+            this.load.image('preload_bar_bg', 'https://peacemissile-game.onrender.com/public/assets/preload_bar_bg.png'); // Barın arkaplanı
+            this.load.image('preload_bar', 'https://peacemissile-game.onrender.com/public/assets/preload_bar.png'); // Yükleme barı
+        }
+        create() {
+            this.scene.start('PreloadScene');
+        }
+    }
+
+    // Preload Scene
+    class PreloadScene extends Phaser.Scene {
+        constructor() {
+            super('PreloadScene');
+        }
+        preload() {
+            // Yükleme ekranı öğeleri
+            let background = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'preload_bg').setOrigin(0.5).setScrollFactor(0);
+            background.displayWidth = this.cameras.main.width;
+            background.displayHeight = this.cameras.main.height;
+
+            let progressBarBg = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2 + 100, 'preload_bar_bg').setOrigin(0.5);
+            let progressBar = this.add.image(this.cameras.main.width / 2 - progressBarBg.width / 2 + 10, this.cameras.main.height / 2 + 100, 'preload_bar').setOrigin(0, 0.5);
+            progressBar.displayWidth = 0; // Başlangıçta boş
+
+            let loadingText = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 + 50, 'Loading Game...', { fontSize: '24px', fill: '#ffffff' }).setOrigin(0.5);
+
+            this.load.on('progress', function (value) {
+                progressBar.displayWidth = progressBarBg.displayWidth * 0.95 * value; // Barın genişliğini ayarla
+            });
+
+            this.load.on('complete', function () {
+                console.log('Tüm varlıklar yüklendi.');
+                loadingText.setText('Loading Complete!');
+            });
+
+            // Gerçek oyun varlıkları
+            this.load.image('background', 'https://peacemissile-game.onrender.com/public/assets/background.png');
+            this.load.image('player_iran', 'https://peacemissile-game.onrender.com/public/assets/player_iran.png');
+            this.load.image('player_israel', 'https://peacemissile-game.onrender.com/public/assets/player_israel.png');
+            this.load.image('missile_iran', 'https://peacemissile-game.onrender.com/public/assets/missile_iran.png');
+            this.load.image('missile_israel', 'https://peacemissile-game.onrender.com/public/assets/missile_israel.png');
+            this.load.image('explosion', 'https://peacemissile-game.onrender.com/public/assets/explosion.png');
+            this.load.image('city', 'https://peacemissile-game.onrender.com/public/assets/city.png');
+            this.load.image('ground', 'https://peacemissile-game.onrender.com/public/assets/ground.png');
+            this.load.audio('explosion_sound', 'https://peacemissile-game.onrender.com/public/assets/explosion.mp3');
+            this.load.audio('background_music', 'https://peacemissile-game.onrender.com/public/assets/bgm.mp3');
+        }
+        create() {
+            // Yükleme tamamlandıktan sonra bir sonraki sahneye geç (örn: TitleScene)
+            this.scene.start('TitleScene');
+        }
+    }
+
+
+    // Title Scene
+    class TitleScene extends Phaser.Scene {
+        constructor() {
+            super('TitleScene');
+        }
+
+        create() {
+            // Arka planı ekle
+            let background = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'background').setOrigin(0.5).setScrollFactor(0);
+            background.displayWidth = this.cameras.main.width;
+            background.displayHeight = this.cameras.main.height;
+
+            // Başlık metni
+            this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 - 100, 'Peace Missile', { fontSize: '64px', fill: '#fff', fontFamily: 'Arial Black' }).setOrigin(0.5);
+
+            // Oyuncunun ismini göster (eğer varsa)
+            if (currentUser) {
+                this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 - 20, `Welcome, ${currentUser.first_name || currentUser.username}!`, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5);
+            }
+
+            // Oynamaya başla butonu
+            const startButton = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 + 80, 'Start Game', { fontSize: '32px', fill: '#fff', backgroundColor: '#007bff', padding: { x: 20, y: 10 } })
+                .setOrigin(0.5)
+                .setInteractive()
+                .on('pointerdown', () => {
+                    this.scene.start('GameScene'); // GameScene'i başlat
+                });
+        }
+    }
+
+    // Game Scene
+    class GameScene extends Phaser.Scene {
+        constructor() {
+            super('GameScene');
+            this.player = null;
+            this.missiles = null;
+            this.enemies = null;
+            this.score = 0;
+            this.scoreText = null;
+            this.health = 3;
+            this.healthText = null;
+            this.explosionSound = null;
+            this.backgroundMusic = null;
+            this.enemyMissileSpeed = 200; // Başlangıç düşman füze hızı
+            this.enemySpawnDelay = 1500; // Başlangıç düşman spawn gecikmesi
+            this.lastEnemySpawnTime = 0;
+        }
+
+        create() {
+            this.score = 0;
+            this.health = 3;
+            this.enemyMissileSpeed = 200;
+            this.enemySpawnDelay = 1500;
+            this.lastEnemySpawnTime = 0;
+
+            // Arka planı ekle
+            let background = this.add.tileSprite(0, 0, this.cameras.main.width, this.cameras.main.height, 'background').setOrigin(0, 0);
+            background.setScrollFactor(0); // Kamera hareket ettiğinde arka plan sabit kalır
+
+            // Zemin ekle
+            this.ground = this.add.tileSprite(0, this.cameras.main.height - 50, this.cameras.main.width, 50, 'ground').setOrigin(0, 0);
+            this.physics.add.existing(this.ground, true); // Statik fizik nesnesi yap
+
+            // Şehirler (can göstergeleri olarak da kullanılabilir)
+            this.cities = this.physics.add.group();
+            const cityPositions = [
+                { x: this.cameras.main.width / 4, y: this.cameras.main.height - 70 },
+                { x: this.cameras.main.width / 2, y: this.cameras.main.height - 70 },
+                { x: this.cameras.main.width * 3 / 4, y: this.cameras.main.height - 70 }
+            ];
+            cityPositions.forEach(pos => {
+                let city = this.cities.create(pos.x, pos.y, 'city').setScale(0.8);
+                city.setImmovable(true);
+            });
+
+            // Oyuncu (bot.py'den seçilen takıma göre)
+            const playerTeam = this.sys.game.playerTeam; // Main Game Config'ten team bilgisini al
+            let playerTexture = playerTeam === 'israel' ? 'player_israel' : 'player_iran';
+            let playerStartPosition = playerTeam === 'israel' ? this.cameras.main.width * 3 / 4 : this.cameras.main.width / 4;
+
+            this.player = this.physics.add.sprite(playerStartPosition, this.cameras.main.height - 100, playerTexture).setScale(0.7);
+            this.player.setCollideWorldBounds(true);
+            this.player.setImmovable(true); // Oyuncu yerinde sabit kalır
+
+            // Füzeler (oyuncunun attığı)
+            this.missiles = this.physics.add.group();
+
+            // Düşmanlar (gelen füzeler)
+            this.enemies = this.physics.add.group();
+
+            // Skor ve Can metni
+            this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff' });
+            this.healthText = this.add.text(this.cameras.main.width - 16, 16, 'Health: 3', { fontSize: '32px', fill: '#fff' }).setOrigin(1, 0);
+
+            // Patlama efekti (geçici görsel)
+            this.explosion = this.add.image(0, 0, 'explosion').setScale(0.5).setVisible(false);
+
+            // Sesler
+            this.explosionSound = this.sound.add('explosion_sound');
+            this.backgroundMusic = this.sound.add('background_music', { loop: true, volume: 0.5 });
+            this.backgroundMusic.play();
+
+
+            // Atış mekaniği
+            this.input.on('pointerdown', (pointer) => {
+                // Oyuncunun fırlatma yönü belirlenir
+                const missileTexture = playerTeam === 'israel' ? 'missile_israel' : 'missile_iran';
+                const startX = this.player.x;
+                const startY = this.player.y;
+                const targetX = pointer.x;
+                const targetY = pointer.y;
+
+                let missile = this.missiles.create(startX, startY, missileTexture);
+                missile.setGravityY(-1000); // Yerçekimini etkilemez
+                this.physics.moveTo(missile, targetX, targetY, 600); // Füzeyi hedefe doğru hareket ettir
+            });
+
+            // Çarpışma algılama: Oyuncu füzesi düşman füzesine çarparsa
+            this.physics.add.collider(this.missiles, this.enemies, (missile, enemy) => {
+                missile.destroy();
+                enemy.destroy();
+                this.explosionSound.play();
+                this.score += 10;
+                this.scoreText.setText('Score: ' + this.score);
+
+                // Patlama efektini göster
+                this.explosion.setPosition(enemy.x, enemy.y).setVisible(true);
+                this.time.delayedCall(100, () => {
+                    this.explosion.setVisible(false);
+                });
+            });
+
+            // Çarpışma algılama: Düşman füzesi zemine çarparsa
+            this.physics.add.collider(this.enemies, this.ground, (enemy, ground) => {
+                enemy.destroy();
+                this.health -= 1;
+                this.healthText.setText('Health: ' + this.health);
+                this.explosionSound.play();
+
+                this.explosion.setPosition(enemy.x, enemy.y).setVisible(true);
+                this.time.delayedCall(100, () => {
+                    this.explosion.setVisible(false);
+                });
+
+                if (this.health <= 0) {
+                    this.gameOver();
+                }
+            });
+
+            // Çarpışma algılama: Düşman füzesi şehre çarparsa
+            this.physics.add.collider(this.enemies, this.cities, (enemy, city) => {
+                enemy.destroy();
+                city.destroy(); // Şehri yok et
+                this.health -= 1;
+                this.healthText.setText('Health: ' + this.health);
+                this.explosionSound.play();
+
+                this.explosion.setPosition(enemy.x, enemy.y).setVisible(true);
+                this.time.delayedCall(100, () => {
+                    this.explosion.setVisible(false);
+                });
+
+                if (this.health <= 0) {
+                    this.gameOver();
+                }
+            });
+        }
+
+        update(time, delta) {
+            // Düşman füzeleri oluştur
+            if (time > this.lastEnemySpawnTime + this.enemySpawnDelay) {
+                this.spawnEnemyMissile();
+                this.lastEnemySpawnTime = time;
+                // Zamanla zorluğu artır
+                if (this.enemySpawnDelay > 500) {
+                    this.enemySpawnDelay -= 20;
+                }
+                if (this.enemyMissileSpeed < 600) {
+                    this.enemyMissileSpeed += 5;
+                }
+            }
+
+            // Ekran dışına çıkan füzeleri temizle
+            this.missiles.children.each(function (missile) {
+                if (missile.y < 0 || missile.y > this.cameras.main.height || missile.x < 0 || missile.x > this.cameras.main.width) {
+                    missile.destroy();
+                }
+            }, this);
+
+            this.enemies.children.each(function (enemy) {
+                if (enemy.y > this.cameras.main.height) { // Ekranın altına ulaştığında
+                    enemy.destroy();
+                }
+            }, this);
+        }
+
+        spawnEnemyMissile() {
+            const side = Phaser.Math.Between(0, 1) === 0 ? 'left' : 'right'; // Füze soldan veya sağdan gelecek
+            const enemyTexture = side === 'left' ? 'missile_israel' : 'missile_iran'; // Rakip takıma göre füze seçimi
+            
+            // Eğer oyuncu İran ise düşman İsrail füzesi atar ve tam tersi.
+            const playerTeam = this.sys.game.playerTeam;
+            let actualEnemyTexture;
+            if (playerTeam === 'iran') {
+                actualEnemyTexture = 'missile_israel';
+            } else { // playerTeam === 'israel'
+                actualEnemyTexture = 'missile_iran';
+            }
+
+            const startX = Phaser.Math.Between(50, this.cameras.main.width - 50); // Ekranın üstünden rastgele bir yerden
+            const startY = 0; // Ekranın en üstü
+
+            let enemy = this.enemies.create(startX, startY, actualEnemyTexture);
+            enemy.setVelocityY(this.enemyMissileSpeed); // Hızı ayarla
+            enemy.setImmovable(true); // Diğer fizik nesneleriyle etkileşime girmesin
+
+            // Füzeyi zayıf bir hedefe yönlendir (şehirlere veya zemine)
+            const targets = [...this.cities.getChildren(), this.ground];
+            if (targets.length > 0) {
+                const target = Phaser.Utils.Array.GetRandom(targets);
+                this.physics.moveTo(enemy, target.x, target.y, this.enemyMissileSpeed);
+            }
+        }
+
+        gameOver() {
+            this.backgroundMusic.stop(); // Müziği durdur
+            // Skoru bota gönder
+            sendScoreToBot(this.score);
+
+            // Oyun bitti sahnesine geç (veya sadece metin göster)
+            this.scene.stop('GameScene');
+            this.scene.start('GameOverScene', { score: this.score }); // Game Over sahnesine skoru gönder
+        }
+    }
+
+    // Game Over Scene
+    class GameOverScene extends Phaser.Scene {
+        constructor() {
+            super('GameOverScene');
+        }
+
+        init(data) {
+            this.finalScore = data.score;
+        }
+
+        create() {
+            // Arka planı ekle
+            let background = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'background').setOrigin(0.5).setScrollFactor(0);
+            background.displayWidth = this.cameras.main.width;
+            background.displayHeight = this.cameras.main.height;
+
+            this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 - 100, 'Game Over!', { fontSize: '64px', fill: '#fff', fontFamily: 'Arial Black' }).setOrigin(0.5);
+            this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2, `Your Score: ${this.finalScore}`, { fontSize: '48px', fill: '#fff' }).setOrigin(0.5);
+
+            const restartButton = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 + 100, 'Play Again', { fontSize: '32px', fill: '#fff', backgroundColor: '#007bff', padding: { x: 20, y: 10 } })
+                .setOrigin(0.5)
+                .setInteractive()
+                .on('pointerdown', () => {
+                    this.scene.start('GameScene'); // GameScene'i yeniden başlat
+                });
+            
+            // Eğer Telegram WebApp açık ise, kapatmak isteyebilirsiniz.
+            // Ama skoru zaten göndermiş olmalıyız.
+            // window.Telegram.WebApp.close(); // Bu satırı sendScoreToBot fonksiyonuna taşıdık.
+        }
+    }
+
+    // Game Configuration
+    const config = {
+        type: Phaser.AUTO,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        parent: 'phaser-game',
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 0 },
+                debug: false
+            }
+        },
+        scene: [BootScene, PreloadScene, TitleScene, GameScene, GameOverScene]
+    };
+
+    // Telegram botundan gelen takım bilgisini al
+    let playerTeam = 'iran'; // Varsayılan değer (eğer bot.py'den gelmezse)
+    if (tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+        // start_param bot.py'deki 'iran' veya 'israel' değeri olmalı
+        if (tg.initDataUnsafe.start_param === 'iran') {
+            playerTeam = 'iran';
+        } else if (tg.initDataUnsafe.start_param === 'israel') {
+            playerTeam = 'israel';
+        }
+    }
+
+    const game = new Phaser.Game(config);
+    game.playerTeam = playerTeam; // Oyuncu takımını global olarak ayarla
+    
+    // Telegram WebApp hazır olduğunda uygulamayı genişlet
+    if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand(); // WebApp'i tam ekran yap
+    }
+
 </script>
 </body>
 </html>
