@@ -42,6 +42,7 @@
     let currentUser;
     let db;
     let userWalletAddress = null; 
+    let game;
 
     // Firebase yapılandırmasını global olarak tanımla
     const firebaseConfig = {
@@ -122,6 +123,7 @@
         }
 
         create() {
+             if (window.Telegram && window.Telegram.WebApp) { 
             tg = window.Telegram.WebApp;
             currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
             tg.ready();
@@ -129,7 +131,10 @@
             console.log("Telegram WebApp Ready and Expanded.");
             console.log("Telegram initDataUnsafe:", tg.initDataUnsafe); // Debug için ekledim
             console.log("Current User:", currentUser); // Debug için ekledim
-
+} else {
+        console.warn("Telegram WebApp API bulunamadı. Kullanıcı bilgisi olmayabilir.");
+        currentUser = { id: 'test_user_id', first_name: 'Guest', username: 'guest' }; // Test için varsayılan bir kullanıcı
+    }
             try {
                 // Firebase'in zaten başlatılıp başlatılmadığını kontrol et
                 if (!firebase.apps.length) {
@@ -641,7 +646,6 @@
                 }
 
                 updateData.username = username;
-                updateData.user_id = currentUser.id;
 
                 await userDocRef.set(updateData, { merge: true });
                 console.log("Skor ve coinler Firebase'e başarıyla kaydedildi/güncellendi. Güncellenen veriler:", updateData);
@@ -687,16 +691,16 @@
         }
     };
 
-    function startGame() {
-        try { 
-            const game = new Phaser.Game(config); 
-            console.log("Phaser oyunu başlatıldı.");
-        } catch (e) { 
-            document.body.innerHTML = `<h1 style="color:red;">HATA: ${e.message}</h1>`; 
-            console.error("Oyun başlatılırken kritik hata:", e);
-        }
-    }
 
+function startGame() {
+    try {
+        game = new Phaser.Game(config); // Burada 'const' yerine 'game =' kullanın
+        console.log("Phaser oyunu başlatıldı.");
+    } catch (e) {
+        document.body.innerHTML = `<h1 style="color:red;">HATA: ${e.message}</h1>`;
+        console.error("Oyun başlatılırken kritik hata:", e);
+    }
+}
     window.addEventListener('load', startGame);
     window.addEventListener('resize', () => {
         if (game) {
