@@ -30,7 +30,7 @@ WEBHOOK_BASE_URL = os.environ.get("WEBHOOK_BASE_URL")
 # Telegram botunuzun webhook path'i için güvenli bir yol oluşturun
 # Bu, Telegram'ın botunuza mesaj göndermek için kullanacağı URL yolu olacak.
 # Genellikle Telegram tokenı kullanılır.
-WEBHOOK_URL_PATH = f"/{TELEGRAM_TOKEN}"
+WEBHOOK_URL_PATH = "/peace_missile_bot_webhook"
 
 db = None
 try:
