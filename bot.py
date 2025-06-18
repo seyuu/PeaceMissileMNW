@@ -16,6 +16,9 @@ PORT = int(os.environ.get("PORT", 10000)) # Render.com genellikle 10000 portunu 
 # Render.com servinizin genel URL'si. Bu genellikle Render tarafından otomatik set edilen
 # "RENDER_EXTERNAL_HOSTNAME" gibi bir ortam değişkeninden alınabilir.
 # Eğer bu değişken yoksa, Render paneli üzerinden URL'i alıp elle tanımlamanız gerekecek.
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 WEBHOOK_BASE_URL = os.environ.get("RENDER_EXTERNAL_HOSTNAME") 
 if not WEBHOOK_BASE_URL:
     logger.warning("RENDER_EXTERNAL_HOSTNAME environment variable not found. Please ensure WEBHOOK_BASE_URL is set correctly in Render.com environment.")
@@ -26,10 +29,6 @@ if not WEBHOOK_BASE_URL:
 # Bu, Telegram'ın botunuza mesaj göndermek için kullanacağı URL yolu olacak.
 # Genellikle Telegram tokenı kullanılır.
 WEBHOOK_URL_PATH = f"/{TELEGRAM_TOKEN}"
-
-
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 db = None
 try:
