@@ -1,120 +1,50 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Peace Missile Game</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } </style>
-</head>
-<body>
-<div id="phaser-game"></div>
 <script type="text/javascript">
     
-    // Tüm mantığı, sayfa tamamen yüklendikten sonra çalışacak olan bir fonksiyona taşıyalım
-    function startApp() {
+    // En dıştaki başlatıcı
+    window.addEventListener('load', function () {
+        // Kütüphanelerin yüklendiğinden emin ol
+        if (typeof Phaser === 'undefined' || typeof firebase === 'undefined' || typeof Telegram === 'undefined') {
+            document.body.innerHTML = `<h1 style="color:red;">Error: Core libraries did not load.</h1>`;
+            return;
+        }
+        // Telegram hazır olduğunda oyunu başlat
+        Telegram.WebApp.ready(runGame);
+    });
+
+
+    function runGame() {
         try {
             // --- 1. KURULUM ---
-            const firebaseConfig = {
-                apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
-                authDomain: "peacemissile-game.firebaseapp.com",
-                projectId: "peacemissile-game",
-                storageBucket: "peacemissile-game.firebasestorage.app",
-                messagingSenderId: "641906716058",
-                appId: "1:641906716058:web:1376e93994fab29f049e23"
-            };
+            const firebaseConfig = { apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc", authDomain: "peacemissile-game.firebaseapp.com", projectId: "peacemissile-game", storageBucket: "peacemissile-game.firebasestorage.app", messagingSenderId: "641906716058", appId: "1:641906716058:web:1376e93994fab29f049e23" };
             firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
             const tg = window.Telegram.WebApp;
             const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
-            tg.ready();
             tg.expand();
 
-            // --- Preloader Sahnesi --- (YENİ EKLEDİĞİM KISIM)
+            // --- 2. PHASER SAHNELERİNİ ÖNCEDEN TANIMLA ---
+            
             class Preloader extends Phaser.Scene {
-                constructor() {
-                    super({ key: 'Preloader' });
-                }
-
+                constructor() { super({ key: 'Preloader' }); }
                 preload() {
-                    // Yükleme ekranı öğelerini burada yükleyebilirsiniz (örneğin bir yükleme çubuğu)
-                    // Ardından oyunun gerçek kaynaklarını yükleyin
-                    // Şu anda LobbyScene ve GameScene'deki preload'lar zaten kaynakları yüklüyor.
-                    // Eğer burada merkezi bir yükleme yapmayacaksanız, bu sahneyi boş bırakıp
-                    // sadece sonraki sahneye geçiş yapabilirsiniz.
-                    
-                    // Örnek: Yükleme çubuğu
-                    let progressBar = this.add.graphics();
-                    let progressBox = this.add.graphics();
-                    progressBox.fillStyle(0x222222, 0.8);
-                    progressBox.fillRect(this.cameras.main.centerX - 160, this.cameras.main.centerY - 25, 320, 50);
-
-                    let loadingText = this.make.text({
-                        x: this.cameras.main.centerX,
-                        y: this.cameras.main.centerY - 50,
-                        text: 'Loading game assets...',
-                        style: {
-                            font: '20px monospace',
-                            fill: '#ffffff'
-                        }
-                    }).setOrigin(0.5, 0.5);
-
-                    let percentText = this.make.text({
-                        x: this.cameras.main.centerX,
-                        y: this.cameras.main.centerY,
-                        text: '0%',
-                        style: {
-                            font: '18px monospace',
-                            fill: '#ffffff'
-                        }
-                    }).setOrigin(0.5, 0.5);
-
-                    this.load.on('progress', function (value) {
-                        percentText.setText(parseInt(value * 100) + '%');
-                        progressBar.clear();
-                        progressBar.fillStyle(0xffffff, 1);
-                        progressBar.fillRect(this.cameras.main.centerX - 150, this.cameras.main.centerY - 15, 300 * value, 30);
-                    }, this);
-
-                    this.load.on('complete', function () {
-                        progressBar.destroy();
-                        progressBox.destroy();
-                        loadingText.destroy();
-                        percentText.destroy();
-                        this.scene.start('LobbyScene'); // Yükleme bittikten sonra Lobi Sahnesine geç
-                    }, this);
-
-                    // Mevcut yüklemeleriniz (LobbyScene ve GameScene'den taşınabilir)
                     this.load.image('lobby_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/lobby_bg.jpg');
                     this.load.image('play_button', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/play_button.png');
                     this.load.image('score_icon', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/score_icon.png');
                     this.load.image('coin_icon', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/coin_icon.png');
-                    
-                    // GameScene varlıkları
-                    const urlParams = new URLSearchParams(window.location.search);
-                    this.selectedSide = urlParams.get('side') || 'israel'; // Preloader'da kullanılamaz, GameScene'e geri taşınmalı
-                    this.load.image('background', `https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/${this.selectedSide || 'israel'}_bg.jpg`); // Geçici çözüm, 'israel' varsayılan
+                    // Oyun için gerekli diğer resimleri de burada yükle
+                    this.load.image('israel_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/israel_bg.jpg');
+                    this.load.image('iran_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/iran_bg.jpg');
                     this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
                     this.load.spritesheet('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif', { frameWidth: 64, frameHeight: 64 });
                 }
-
                 create() {
-                    // Yükleme bittikten sonra LobbyScene'e geçişi preload'un 'complete' eventine taşıdım.
-                    // Bu fonksiyon içinde başka bir şeye ihtiyacınız yoksa boş kalabilir.
+                    this.anims.create({ key: 'explode_anim', frames: this.anims.generateFrameNumbers('explosion'), frameRate: 20, repeat: 0, hideOnComplete: true });
+                    this.scene.start('LobbyScene');
                 }
             }
 
-
-            // --- Lobi Sahnesi ---
             class LobbyScene extends Phaser.Scene {
                 constructor() { super({ key: 'LobbyScene' }); }
-                preload() { 
-                    // Preloader sahnesine taşınan kaynakları buradan kaldırdım
-                    // Eğer sadece LobbyScene'e özel kaynaklar varsa burada kalabilir.
-                }
                 create() {
                     const gameWidth = this.cameras.main.width; const gameHeight = this.cameras.main.height;
                     this.add.image(gameWidth / 2, gameHeight / 2, 'lobby_bg').setDisplaySize(gameWidth, gameHeight);
@@ -135,38 +65,37 @@
                 }
             }
 
-            // --- Oyun Sahnesi ---
             class GameScene extends Phaser.Scene {
                 constructor() { super({ key: 'GameScene' }); }
-                preload() { 
-                    // Oyunun arka plan resmi, kullanıcı seçimine göre değiştiği için
-                    // Preloader'da önceden yüklenemeyebilir. Buraya geri taşıdım.
+                create() {
+                    this.sessionScore = 0; this.health = 3; this.isGameOver = false;
                     const urlParams = new URLSearchParams(window.location.search);
-                    this.selectedSide = urlParams.get('side') || 'israel';
-                    this.load.image('background', `https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/${this.selectedSide}_bg.jpg`);
-                    
-                    // Diğer ortak kaynaklar Preloader'da yüklendi.
-                    // this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
-                    // this.load.spritesheet('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif', { frameWidth: 64, frameHeight: 64 });
+                    const selectedSide = urlParams.get('side') || 'israel';
+                    this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, selectedSide === 'iran' ? 'iran_bg' : 'israel_bg').setDisplaySize(this.cameras.main.width, this.cameras.main.height);
+                    this.scoreText=this.add.text(16,16,"Score: 0",{fontSize:"32px",fill:"#fff",stroke:"#000",strokeThickness:4}),this.healthText=this.add.text(this.cameras.main.width-16,16,"Health: 3",{fontSize:"32px",fill:"#fff",stroke:"#000",strokeThickness:4}).setOrigin(1,0),this.rockets=this.physics.add.group(),this.time.addEvent({delay:1300,callback:this.spawnRocket,callbackScope:this,loop:!0})
                 }
-                create() { this.anims.create({ key: 'explode_anim', frames: this.anims.generateFrameNumbers('explosion'), frameRate: 20, repeat: 0, hideOnComplete: true }); this.sessionScore = 0; this.health = 3; this.isGameOver = false; let bg = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, 'background'); bg.setDisplaySize(this.cameras.main.width, this.cameras.main.height); this.buildings = this.physics.add.staticGroup(); this.buildings.create(this.cameras.main.width / 2, this.cameras.main.height).setSize(this.cameras.main.width, this.cameras.main.height * 0.2).setOrigin(0.5, 0.8).setVisible(false).refreshBody(); this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 }); this.healthText = this.add.text(this.cameras.main.width - 16, 16, 'Health: 3', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 }).setOrigin(1, 0); this.rockets = this.physics.add.group(); this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this); this.time.addEvent({ delay: 1300, callback: this.spawnRocket, callbackScope: this, loop: true }); }
-                spawnRocket() { if (this.isGameOver) return; const e = Phaser.Math.Between(40, this.cameras.main.width - 40); const t = this.rockets.create(e, -100, "rocket"); t.setAngle(180), t.setVelocityY(Phaser.Math.Between(300, 500)), t.setInteractive({ useHandCursor: !0 }), t.on("pointerdown", () => this.destroyRocket(t)) }
-                destroyRocket(e) { if (!e.active) return; this.sessionScore += 10; this.scoreText.setText("Score: " + this.sessionScore); let t = this.add.sprite(e.x, e.y, "explosion"); t.play("explode_anim"), e.destroy() }
-                hitBuilding(e, t) { if (!e.active) return; this.health -= 1; this.healthText.setText("Health: " + this.health); if (tg) tg.HapticFeedback.notificationOccurred("error"); let s = this.add.sprite(e.x, e.y, "explosion"); s.play("explode_anim").setTint(16711680), this.cameras.main.shake(100, .01), e.destroy(), this.health <= 0 && this.gameOver() }
-                gameOver() { if (this.isGameOver) return; this.isGameOver = true; this.physics.pause(); this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'GAME OVER\nScore: ' + this.sessionScore, { fontSize: '48px', fill: '#ff0000', align: 'center' }).setOrigin(0.5); if (currentUser && this.sessionScore > 0 && db) { const e = db.collection("users").doc(String(currentUser.id)); e.get().then(t => { if (t.exists) { const s = t.data(); const o = s.score || 0; let i = firebase.firestore.FieldValue.increment(this.sessionScore); this.sessionScore > o && (i = firebase.firestore.FieldValue.increment(this.sessionScore + 100 * this.sessionScore)), e.update({ total_score: firebase.firestore.FieldValue.increment(this.sessionScore), total_pmno_coins: i, score: Math.max(o, this.sessionScore) }) } else e.set({ score: this.sessionScore, total_score: this.sessionScore, total_pmno_coins: this.sessionScore + 100 * this.sessionScore, username: currentUser.username || currentUser.first_name, user_id: currentUser.id }) }).catch(e => console.error("Firebase Error:", e)) } this.time.delayedCall(4e3, () => this.scene.start('LobbyScene')) }
+                spawnRocket(){if(this.isGameOver)return;const e=Phaser.Math.Between(40,this.cameras.main.width-40),t=this.rockets.create(e,-100,"rocket");t.setAngle(180),t.setVelocityY(Phaser.Math.Between(300,500)),t.setInteractive({useHandCursor:!0}),t.on("pointerdown",()=>this.destroyRocket(t))}
+                destroyRocket(e){if(!e.active)return;this.sessionScore+=10,this.scoreText.setText("Score: "+this.sessionScore);let t=this.add.sprite(e.x,e.y,"explosion");t.play("explode_anim"),e.destroy()}
+                update(){if(this.isGameOver)return;this.rockets.children.each(e=>{if(e.y>this.cameras.main.height+100){e.destroy(),this.health-=1,this.healthText.setText("Health: "+this.health),this.health<=0&&this.gameOver()}})}
+                gameOver() { if (this.isGameOver) return; this.isGameOver = true; this.physics.pause(); this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'GAME OVER\nScore: ' + this.sessionScore, { fontSize: '48px', fill: '#ff0000', align: 'center' }).setOrigin(0.5); if (currentUser && this.sessionScore > 0 && db) { const e = db.collection("users").doc(String(currentUser.id)); e.get().then(t => { if (t.exists) { const s = t.data(); e.update({ total_score: firebase.firestore.FieldValue.increment(this.sessionScore), total_pmno_coins: firebase.firestore.FieldValue.increment(this.sessionScore + (this.sessionScore > s.score ? 100 * this.sessionScore : 0)), score: Math.max(s.score, this.sessionScore) }) } else e.set({ score: this.sessionScore, total_score: this.sessionScore, total_pmno_coins: this.sessionScore + 100 * this.sessionScore, username: currentUser.username || currentUser.first_name, user_id: currentUser.id }) }).catch(e => console.error("Firebase Error:", e)) } setTimeout(() => this.scene.start('LobbyScene'), 4000) }
             }
 
-            // --- Oyun Yapılandırması ---
-            const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade' }, scene: [Preloader, LobbyScene, GameScene] };
+            // --- 3. OYUN YAPILANDIRMASI ---
+            const config = {
+                type: Phaser.AUTO,
+                width: window.innerWidth,
+                height: window.innerHeight,
+                physics: { default: 'arcade' },
+                scene: [ Preloader, LobbyScene, GameScene ] // Sahneleri doğru sırayla ekle
+            };
+            
+            // Oyunu başlat
             new Phaser.Game(config);
 
         } catch (e) {
             document.body.innerHTML = `<h1 style="color:red; padding: 20px;">RUNTIME ERROR: ${e.message}</h1>`;
         }
     }
-
-    // --- Başlatıcı ---
-    window.addEventListener('load', startApp);
 
 </script>
 </body>
