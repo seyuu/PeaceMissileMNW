@@ -301,7 +301,7 @@ def main() -> None:
         url_path=WEBHOOK_URL_PATH,
         webhook_url=f"{WEBHOOK_BASE_URL}{WEBHOOK_URL_PATH}" # HTTPS kullanıyoruz
     )
-    logger.info(f"Bot running with webhook on port {PORT}, URL: https://{WEBHOOK_BASE_URL}{WEBHOOK_URL_PATH}")
+    logger.info(f"Bot running with webhook on port {PORT}, URL: {WEBHOOK_BASE_URL}{WEBHOOK_URL_PATH}")
 
 if __name__ == '__main__':
     main()
