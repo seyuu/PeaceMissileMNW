@@ -4,480 +4,142 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Peace Missile Game</title>
+    <!-- Gerekli Kütüphaneler -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } canvas { display: block; } </style>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <style> body, html { margin: 0; padding: 0; overflow: hidden; background-color: #000; } </style>
 </head>
 <body>
 <div id="phaser-game"></div>
 <script type="text/javascript">
+
+function initializeGame() {
+    // --- 1. KURULUM ---
     const tg = window.Telegram.WebApp;
     const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
-    
-    // Firebase ile ilgili değişken ve fonksiyonları bu dosyadan kaldırıyorum.
-    // let db; // Firebase veritabanı referansı
-
-    // Firebase'i burada başlatmaya gerek yok, bot.py yönetecek.
-    /*
+    let db;
     try {
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY", // Buraya kendi Firebase API anahtarınızı girin
-            authDomain: "YOUR_AUTH_DOMAIN",
+            apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
+            authDomain: "peacemissile-game.firebaseapp.com",
             projectId: "peacemissile-game",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            storageBucket: "peacemissile-game.firebasestorage.app",
+            messagingSenderId: "641906716058",
+            appId: "1:641906716058:web:1376e93994fab29f049e23"
         };
-        if (!firebase_admin.apps.length) { // firebase_admin değil, firebase!
-            firebase.initializeApp(firebaseConfig);
-        }
+        firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        console.log("Firebase initialized (client-side).");
     } catch (e) {
-        console.error("Error initializing Firebase (client-side):", e);
+        console.error("Firebase initialization failed:", e);
     }
-    */
+    
+    // --- 2. SAHNELER ---
 
-    // Yeni: Skoru bota gönderen fonksiyon
-    function sendScoreToBot(finalScore) {
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
-            const userId = window.Telegram.WebApp.initDataUnsafe.user.id.toString();
-            const dataToSend = {
-                user_id: userId,
-                final_score: finalScore
-            };
+    class Preloader extends Phaser.Scene {
+        constructor() { super({ key: 'Preloader' }); }
+        preload() {
+            this.load.image('israel_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/israel_bg.jpg');
+            this.load.image('iran_bg', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/iran_bg.jpg');
+            this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
+            this.load.image('destroyed_building', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/destroyed_building.png');
+            this.load.spritesheet('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif', { frameWidth: 64, frameHeight: 64 });
+        }
+        create() {
+            this.anims.create({ key: 'explode_anim', frames: this.anims.generateFrameNumbers('explosion'), frameRate: 20, repeat: 0, hideOnComplete: true });
+            this.scene.start('GameScene');
+        }
+    }
+    
+    class GameScene extends Phaser.Scene {
+        constructor() { super({ key: 'GameScene' }); }
+        
+        create() {
+            this.score = 0; this.health = 3; this.isGameOver = false;
+            const gameWidth = this.cameras.main.width; const gameHeight = this.cameras.main.height;
+            const urlParams = new URLSearchParams(window.location.search);
+            this.selectedSide = urlParams.get('side') || 'israel';
+            
+            let bg = this.add.image(gameWidth/2, gameHeight/2, this.selectedSide === 'iran' ? 'iran_bg' : 'israel_bg');
+            bg.setDisplaySize(gameWidth, gameHeight);
 
-            console.log("Skor bota gönderiliyor:", dataToSend);
-            window.Telegram.WebApp.sendData(JSON.stringify(dataToSend));
-            window.Telegram.WebApp.close(); // İsteğe bağlı: Oyun penceresini kapat
+            this.buildings = this.physics.add.staticGroup();
+            // ... (Bina oluşturma mantığın buraya gelecek) ...
 
-        } else {
-            console.error("Telegram WebApp başlatılmamış veya kullanıcı bilgisi yok. Skor bota gönderilemedi.");
-            // Geliştirme ortamında test ediyorsanız bu mesajı görebilirsiniz.
-            // Canlıda, bu durumda skoru kaydetme işlemi gerçekleşmez.
+            this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
+            this.healthText = this.add.text(gameWidth - 16, 16, 'Health: 3', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 }).setOrigin(1, 0);
+
+            this.rockets = this.physics.add.group();
+            this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this);
+            this.time.addEvent({ delay: 1300, callback: this.spawnRocket, callbackScope: this, loop: true });
+        }
+        
+        spawnRocket() { if (this.isGameOver) return; const x = Phaser.Math.Between(40, this.cameras.main.width - 40); const rocket = this.rockets.create(x, -100, "rocket"); rocket.setAngle(180); rocket.setVelocityY(Phaser.Math.Between(300, 500)); rocket.setInteractive({ useHandCursor: true }); rocket.on("pointerdown", () => this.destroyRocket(rocket)); }
+        destroyRocket(rocket) { if (!rocket.active) return; this.score += 10; this.scoreText.setText("Score: " + this.score); let explosionSprite = this.add.sprite(rocket.x, rocket.y, 'explosion'); explosionSprite.play('explode_anim'); rocket.destroy(); }
+        hitBuilding(rocket, building) { if (!rocket.active) return; this.health -= 1; this.healthText.setText("Health: " + this.health); if (tg) tg.HapticFeedback.notificationOccurred("error"); let explosionSprite = this.add.sprite(rocket.x, rocket.y, 'explosion').play('explode_anim').setTint(0xff0000); this.cameras.main.shake(100, 0.01); rocket.destroy(); if (this.health <= 0) this.gameOver(); }
+        
+        gameOver() {
+            if (this.isGameOver) return; this.isGameOver = true; this.physics.pause();
+            this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'GAME OVER\nScore: ' + this.score, { fontSize: '48px', fill: '#ff0000', align: 'center' }).setOrigin(0.5);
+            if (currentUser && this.score > 0) { saveScore(this.score); }
+            setTimeout(() => { if (tg) tg.close(); }, 4000);
         }
     }
 
-
-    // Eski saveScore fonksiyonu kaldırıldı veya yerine sendScoreToBot çağrısı eklendi.
-    // Fonksiyonun ismiyle ilgili problem vardı, çünkü bu fonksiyon sadece Firebase'e kaydetmeye çalışıyordu.
-    // Bu fonksiyona artık ihtiyacınız yok, çünkü botunuza göndereceksiniz.
-    /*
-    function saveScore(score, callback) {
-        if (!currentUser) {
-            console.error("Kullanıcı bilgisi yok, skor kaydedilemez.");
-            if (callback) callback(false);
-            return;
-        }
-
-        const userDocRef = db.collection('users').doc(currentUser.id.toString());
-
-        userDocRef.get().then(doc => {
-            let currentHighScore = 0;
-            if (doc.exists) {
-                currentHighScore = doc.data().score || 0;
-            }
-
-            let isNewHighScore = score > currentHighScore;
-
-            if (isNewHighScore) {
-                console.log("Yeni yüksek skor:", score);
-                userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` }, { merge: true })
-                    .then(() => {
-                        console.log("Skor Firebase'e başarıyla kaydedildi.");
-                        if (callback) callback(true);
-                    })
-                    .catch(err => {
-                        console.error("Skor kaydetme hatası:", err);
-                        if (callback) callback(false); // Hata durumunda da callback'i çağır
+    // --- 3. VERİTABANI FONKSİYONU ---
+    function saveScore(sessionScore) {
+        if (!db || !currentUser) return;
+        const userDocRef = db.collection('users').doc(String(currentUser.id));
+        
+        db.runTransaction(transaction => {
+            return transaction.get(userDocRef).then(doc => {
+                if (!doc.exists) {
+                    transaction.set(userDocRef, { 
+                        score: sessionScore, // En yüksek skor
+                        total_score: sessionScore,
+                        total_pmno_coins: sessionScore + (sessionScore * 100), // İlk oyun rekor olduğu için bonuslu
+                        username: currentUser.username || currentUser.first_name
                     });
-            } else {
-                console.log("Yeni skor, mevcut yüksek skordan daha düşük veya eşit. Kaydedilmedi.");
-                if (callback) callback(isNewHighScore);
-            }
-        }).catch(err => {
-            console.error("Skor okuma hatası:", err);
-            // Okuma hatası durumunda bile deneme amaçlı kaydetme (yeni yüksek skor olmasa bile)
-            userDocRef.set({ score: score, username: currentUser.username || currentUser.first_name || `User${currentUser.id}` }, { merge: true })
-                .then(() => {
-                    console.log("İlk skor veya hata sonrası skor başarıyla kaydedildi.");
-                    if (callback) callback(true);
-                })
-                .catch(err => {
-                    console.error("Hata sonrası skor kaydetme hatası:", err);
-                    if (callback) callback(false);
-                });
+                } else {
+                    const data = doc.data();
+                    const currentHighest = data.score || 0;
+                    const currentTotal = data.total_score || 0;
+                    const currentCoins = data.total_pmno_coins || 0;
+                    
+                    let newCoins = currentCoins + sessionScore;
+                    let newHighest = currentHighest;
+
+                    if (sessionScore > currentHighest) {
+                        newHighest = sessionScore;
+                        newCoins += sessionScore * 100; // Rekor bonusu
+                    }
+
+                    transaction.update(userDocRef, {
+                        score: newHighest,
+                        total_score: currentTotal + sessionScore,
+                        total_pmno_coins: newCoins
+                    });
+                }
+            });
+        }).then(() => {
+            console.log("Transaction successfully committed!");
+        }).catch(error => {
+            console.log("Transaction failed: ", error);
         });
     }
-    */
 
-
-    // --- GAME SCENES ---
-
-    // Boot Scene
-    class BootScene extends Phaser.Scene {
-        constructor() {
-            super('BootScene');
-        }
-        preload() {
-            // Placeholder for loading assets
-            this.load.image('preload_bg', 'https://peacemissile-game.onrender.com/public/assets/preload_bg.png'); // Arka plan
-            this.load.image('preload_bar_bg', 'https://peacemissile-game.onrender.com/public/assets/preload_bar_bg.png'); // Barın arkaplanı
-            this.load.image('preload_bar', 'https://peacemissile-game.onrender.com/public/assets/preload_bar.png'); // Yükleme barı
-        }
-        create() {
-            this.scene.start('PreloadScene');
-        }
-    }
-
-    // Preload Scene
-    class PreloadScene extends Phaser.Scene {
-        constructor() {
-            super('PreloadScene');
-        }
-        preload() {
-            // Yükleme ekranı öğeleri
-            let background = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'preload_bg').setOrigin(0.5).setScrollFactor(0);
-            background.displayWidth = this.cameras.main.width;
-            background.displayHeight = this.cameras.main.height;
-
-            let progressBarBg = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2 + 100, 'preload_bar_bg').setOrigin(0.5);
-            let progressBar = this.add.image(this.cameras.main.width / 2 - progressBarBg.width / 2 + 10, this.cameras.main.height / 2 + 100, 'preload_bar').setOrigin(0, 0.5);
-            progressBar.displayWidth = 0; // Başlangıçta boş
-
-            let loadingText = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 + 50, 'Loading Game...', { fontSize: '24px', fill: '#ffffff' }).setOrigin(0.5);
-
-            this.load.on('progress', function (value) {
-                progressBar.displayWidth = progressBarBg.displayWidth * 0.95 * value; // Barın genişliğini ayarla
-            });
-
-            this.load.on('complete', function () {
-                console.log('Tüm varlıklar yüklendi.');
-                loadingText.setText('Loading Complete!');
-            });
-
-            // Gerçek oyun varlıkları
-            this.load.image('background', 'https://peacemissile-game.onrender.com/public/assets/background.png');
-            this.load.image('player_iran', 'https://peacemissile-game.onrender.com/public/assets/player_iran.png');
-            this.load.image('player_israel', 'https://peacemissile-game.onrender.com/public/assets/player_israel.png');
-            this.load.image('missile_iran', 'https://peacemissile-game.onrender.com/public/assets/missile_iran.png');
-            this.load.image('missile_israel', 'https://peacemissile-game.onrender.com/public/assets/missile_israel.png');
-            this.load.image('explosion', 'https://peacemissile-game.onrender.com/public/assets/explosion.png');
-            this.load.image('city', 'https://peacemissile-game.onrender.com/public/assets/city.png');
-            this.load.image('ground', 'https://peacemissile-game.onrender.com/public/assets/ground.png');
-            this.load.audio('explosion_sound', 'https://peacemissile-game.onrender.com/public/assets/explosion.mp3');
-            this.load.audio('background_music', 'https://peacemissile-game.onrender.com/public/assets/bgm.mp3');
-        }
-        create() {
-            // Yükleme tamamlandıktan sonra bir sonraki sahneye geç (örn: TitleScene)
-            this.scene.start('TitleScene');
-        }
-    }
-
-
-    // Title Scene
-    class TitleScene extends Phaser.Scene {
-        constructor() {
-            super('TitleScene');
-        }
-
-        create() {
-            // Arka planı ekle
-            let background = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'background').setOrigin(0.5).setScrollFactor(0);
-            background.displayWidth = this.cameras.main.width;
-            background.displayHeight = this.cameras.main.height;
-
-            // Başlık metni
-            this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 - 100, 'Peace Missile', { fontSize: '64px', fill: '#fff', fontFamily: 'Arial Black' }).setOrigin(0.5);
-
-            // Oyuncunun ismini göster (eğer varsa)
-            if (currentUser) {
-                this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 - 20, `Welcome, ${currentUser.first_name || currentUser.username}!`, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5);
-            }
-
-            // Oynamaya başla butonu
-            const startButton = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 + 80, 'Start Game', { fontSize: '32px', fill: '#fff', backgroundColor: '#007bff', padding: { x: 20, y: 10 } })
-                .setOrigin(0.5)
-                .setInteractive()
-                .on('pointerdown', () => {
-                    this.scene.start('GameScene'); // GameScene'i başlat
-                });
-        }
-    }
-
-    // Game Scene
-    class GameScene extends Phaser.Scene {
-        constructor() {
-            super('GameScene');
-            this.player = null;
-            this.missiles = null;
-            this.enemies = null;
-            this.score = 0;
-            this.scoreText = null;
-            this.health = 3;
-            this.healthText = null;
-            this.explosionSound = null;
-            this.backgroundMusic = null;
-            this.enemyMissileSpeed = 200; // Başlangıç düşman füze hızı
-            this.enemySpawnDelay = 1500; // Başlangıç düşman spawn gecikmesi
-            this.lastEnemySpawnTime = 0;
-        }
-
-        create() {
-            this.score = 0;
-            this.health = 3;
-            this.enemyMissileSpeed = 200;
-            this.enemySpawnDelay = 1500;
-            this.lastEnemySpawnTime = 0;
-
-            // Arka planı ekle
-            let background = this.add.tileSprite(0, 0, this.cameras.main.width, this.cameras.main.height, 'background').setOrigin(0, 0);
-            background.setScrollFactor(0); // Kamera hareket ettiğinde arka plan sabit kalır
-
-            // Zemin ekle
-            this.ground = this.add.tileSprite(0, this.cameras.main.height - 50, this.cameras.main.width, 50, 'ground').setOrigin(0, 0);
-            this.physics.add.existing(this.ground, true); // Statik fizik nesnesi yap
-
-            // Şehirler (can göstergeleri olarak da kullanılabilir)
-            this.cities = this.physics.add.group();
-            const cityPositions = [
-                { x: this.cameras.main.width / 4, y: this.cameras.main.height - 70 },
-                { x: this.cameras.main.width / 2, y: this.cameras.main.height - 70 },
-                { x: this.cameras.main.width * 3 / 4, y: this.cameras.main.height - 70 }
-            ];
-            cityPositions.forEach(pos => {
-                let city = this.cities.create(pos.x, pos.y, 'city').setScale(0.8);
-                city.setImmovable(true);
-            });
-
-            // Oyuncu (bot.py'den seçilen takıma göre)
-            const playerTeam = this.sys.game.playerTeam; // Main Game Config'ten team bilgisini al
-            let playerTexture = playerTeam === 'israel' ? 'player_israel' : 'player_iran';
-            let playerStartPosition = playerTeam === 'israel' ? this.cameras.main.width * 3 / 4 : this.cameras.main.width / 4;
-
-            this.player = this.physics.add.sprite(playerStartPosition, this.cameras.main.height - 100, playerTexture).setScale(0.7);
-            this.player.setCollideWorldBounds(true);
-            this.player.setImmovable(true); // Oyuncu yerinde sabit kalır
-
-            // Füzeler (oyuncunun attığı)
-            this.missiles = this.physics.add.group();
-
-            // Düşmanlar (gelen füzeler)
-            this.enemies = this.physics.add.group();
-
-            // Skor ve Can metni
-            this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff' });
-            this.healthText = this.add.text(this.cameras.main.width - 16, 16, 'Health: 3', { fontSize: '32px', fill: '#fff' }).setOrigin(1, 0);
-
-            // Patlama efekti (geçici görsel)
-            this.explosion = this.add.image(0, 0, 'explosion').setScale(0.5).setVisible(false);
-
-            // Sesler
-            this.explosionSound = this.sound.add('explosion_sound');
-            this.backgroundMusic = this.sound.add('background_music', { loop: true, volume: 0.5 });
-            this.backgroundMusic.play();
-
-
-            // Atış mekaniği
-            this.input.on('pointerdown', (pointer) => {
-                // Oyuncunun fırlatma yönü belirlenir
-                const missileTexture = playerTeam === 'israel' ? 'missile_israel' : 'missile_iran';
-                const startX = this.player.x;
-                const startY = this.player.y;
-                const targetX = pointer.x;
-                const targetY = pointer.y;
-
-                let missile = this.missiles.create(startX, startY, missileTexture);
-                missile.setGravityY(-1000); // Yerçekimini etkilemez
-                this.physics.moveTo(missile, targetX, targetY, 600); // Füzeyi hedefe doğru hareket ettir
-            });
-
-            // Çarpışma algılama: Oyuncu füzesi düşman füzesine çarparsa
-            this.physics.add.collider(this.missiles, this.enemies, (missile, enemy) => {
-                missile.destroy();
-                enemy.destroy();
-                this.explosionSound.play();
-                this.score += 10;
-                this.scoreText.setText('Score: ' + this.score);
-
-                // Patlama efektini göster
-                this.explosion.setPosition(enemy.x, enemy.y).setVisible(true);
-                this.time.delayedCall(100, () => {
-                    this.explosion.setVisible(false);
-                });
-            });
-
-            // Çarpışma algılama: Düşman füzesi zemine çarparsa
-            this.physics.add.collider(this.enemies, this.ground, (enemy, ground) => {
-                enemy.destroy();
-                this.health -= 1;
-                this.healthText.setText('Health: ' + this.health);
-                this.explosionSound.play();
-
-                this.explosion.setPosition(enemy.x, enemy.y).setVisible(true);
-                this.time.delayedCall(100, () => {
-                    this.explosion.setVisible(false);
-                });
-
-                if (this.health <= 0) {
-                    this.gameOver();
-                }
-            });
-
-            // Çarpışma algılama: Düşman füzesi şehre çarparsa
-            this.physics.add.collider(this.enemies, this.cities, (enemy, city) => {
-                enemy.destroy();
-                city.destroy(); // Şehri yok et
-                this.health -= 1;
-                this.healthText.setText('Health: ' + this.health);
-                this.explosionSound.play();
-
-                this.explosion.setPosition(enemy.x, enemy.y).setVisible(true);
-                this.time.delayedCall(100, () => {
-                    this.explosion.setVisible(false);
-                });
-
-                if (this.health <= 0) {
-                    this.gameOver();
-                }
-            });
-        }
-
-        update(time, delta) {
-            // Düşman füzeleri oluştur
-            if (time > this.lastEnemySpawnTime + this.enemySpawnDelay) {
-                this.spawnEnemyMissile();
-                this.lastEnemySpawnTime = time;
-                // Zamanla zorluğu artır
-                if (this.enemySpawnDelay > 500) {
-                    this.enemySpawnDelay -= 20;
-                }
-                if (this.enemyMissileSpeed < 600) {
-                    this.enemyMissileSpeed += 5;
-                }
-            }
-
-            // Ekran dışına çıkan füzeleri temizle
-            this.missiles.children.each(function (missile) {
-                if (missile.y < 0 || missile.y > this.cameras.main.height || missile.x < 0 || missile.x > this.cameras.main.width) {
-                    missile.destroy();
-                }
-            }, this);
-
-            this.enemies.children.each(function (enemy) {
-                if (enemy.y > this.cameras.main.height) { // Ekranın altına ulaştığında
-                    enemy.destroy();
-                }
-            }, this);
-        }
-
-        spawnEnemyMissile() {
-            const side = Phaser.Math.Between(0, 1) === 0 ? 'left' : 'right'; // Füze soldan veya sağdan gelecek
-            const enemyTexture = side === 'left' ? 'missile_israel' : 'missile_iran'; // Rakip takıma göre füze seçimi
-            
-            // Eğer oyuncu İran ise düşman İsrail füzesi atar ve tam tersi.
-            const playerTeam = this.sys.game.playerTeam;
-            let actualEnemyTexture;
-            if (playerTeam === 'iran') {
-                actualEnemyTexture = 'missile_israel';
-            } else { // playerTeam === 'israel'
-                actualEnemyTexture = 'missile_iran';
-            }
-
-            const startX = Phaser.Math.Between(50, this.cameras.main.width - 50); // Ekranın üstünden rastgele bir yerden
-            const startY = 0; // Ekranın en üstü
-
-            let enemy = this.enemies.create(startX, startY, actualEnemyTexture);
-            enemy.setVelocityY(this.enemyMissileSpeed); // Hızı ayarla
-            enemy.setImmovable(true); // Diğer fizik nesneleriyle etkileşime girmesin
-
-            // Füzeyi zayıf bir hedefe yönlendir (şehirlere veya zemine)
-            const targets = [...this.cities.getChildren(), this.ground];
-            if (targets.length > 0) {
-                const target = Phaser.Utils.Array.GetRandom(targets);
-                this.physics.moveTo(enemy, target.x, target.y, this.enemyMissileSpeed);
-            }
-        }
-
-        gameOver() {
-            this.backgroundMusic.stop(); // Müziği durdur
-            // Skoru bota gönder
-            sendScoreToBot(this.score);
-
-            // Oyun bitti sahnesine geç (veya sadece metin göster)
-            this.scene.stop('GameScene');
-            this.scene.start('GameOverScene', { score: this.score }); // Game Over sahnesine skoru gönder
-        }
-    }
-
-    // Game Over Scene
-    class GameOverScene extends Phaser.Scene {
-        constructor() {
-            super('GameOverScene');
-        }
-
-        init(data) {
-            this.finalScore = data.score;
-        }
-
-        create() {
-            // Arka planı ekle
-            let background = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'background').setOrigin(0.5).setScrollFactor(0);
-            background.displayWidth = this.cameras.main.width;
-            background.displayHeight = this.cameras.main.height;
-
-            this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 - 100, 'Game Over!', { fontSize: '64px', fill: '#fff', fontFamily: 'Arial Black' }).setOrigin(0.5);
-            this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2, `Your Score: ${this.finalScore}`, { fontSize: '48px', fill: '#fff' }).setOrigin(0.5);
-
-            const restartButton = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 + 100, 'Play Again', { fontSize: '32px', fill: '#fff', backgroundColor: '#007bff', padding: { x: 20, y: 10 } })
-                .setOrigin(0.5)
-                .setInteractive()
-                .on('pointerdown', () => {
-                    this.scene.start('GameScene'); // GameScene'i yeniden başlat
-                });
-            
-            // Eğer Telegram WebApp açık ise, kapatmak isteyebilirsiniz.
-            // Ama skoru zaten göndermiş olmalıyız.
-            // window.Telegram.WebApp.close(); // Bu satırı sendScoreToBot fonksiyonuna taşıdık.
-        }
-    }
-
-    // Game Configuration
-    const config = {
-        type: Phaser.AUTO,
-        width: window.innerWidth,
-        height: window.innerHeight,
-        parent: 'phaser-game',
-        physics: {
-            default: 'arcade',
-            arcade: {
-                gravity: { y: 0 },
-                debug: false
-            }
-        },
-        scene: [BootScene, PreloadScene, TitleScene, GameScene, GameOverScene]
-    };
-
-    // Telegram botundan gelen takım bilgisini al
-    let playerTeam = 'iran'; // Varsayılan değer (eğer bot.py'den gelmezse)
-    if (tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
-        // start_param bot.py'deki 'iran' veya 'israel' değeri olmalı
-        if (tg.initDataUnsafe.start_param === 'iran') {
-            playerTeam = 'iran';
-        } else if (tg.initDataUnsafe.start_param === 'israel') {
-            playerTeam = 'israel';
-        }
-    }
-
+    // --- 4. OYUNU BAŞLATMA ---
+    const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade' }, scene: [Preloader, GameScene] };
     const game = new Phaser.Game(config);
-    game.playerTeam = playerTeam; // Oyuncu takımını global olarak ayarla
-    
-    // Telegram WebApp hazır olduğunda uygulamayı genişlet
-    if (window.Telegram && window.Telegram.WebApp) {
-        window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand(); // WebApp'i tam ekran yap
-    }
+}
 
+// --- 5. BAŞLATICI ---
+if (window.Telegram && window.Telegram.WebApp) {
+    window.Telegram.WebApp.ready(runGame);
+} else {
+    window.addEventListener('load', runGame);
+}
 </script>
 </body>
 </html>
