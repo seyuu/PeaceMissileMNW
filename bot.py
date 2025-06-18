@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 import firebase_admin
 import base64
 import json
@@ -147,8 +148,8 @@ async def start(update: Update, context: CallbackContext) -> None:
     # --- Taraf seçimi butonları burada ---
     keyboard = [
         [
-            InlineKeyboardButton("🇮🇱 Defend Israel", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=israel")),
-            InlineKeyboardButton("🇮🇷 Defend Iran", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=iran"))
+            InlineKeyboardButton("🇮🇱 Defend Israel", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=israel&v={int(time.time())}")),
+            InlineKeyboardButton("🇮🇷 Defend Iran", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=iran&v={int(time.time())}"))
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
