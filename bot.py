@@ -1,4 +1,3 @@
-
 import os
 import logging
 import firebase_admin
@@ -220,7 +219,7 @@ async def update_user_score(user_id: str, new_game_score: int):
         user_ref.update({
             'score': current_highest_score,        # Tekil oyun en yüksek skoru
             'total_score': total_accumulated_score, # Tüm oyunların toplam skoru
-            'total_pmno_coins': total_pmno_coins   # Toplam PMNOFO Coin
+            'total_pmno_coins': total_pmno_coins  # Toplam PMNOFO Coin
         })
         logger.info(f"User {user_id} scores updated. New highest: {current_highest_score}, Total Score: {total_accumulated_score}, Total Coins: {total_pmno_coins}")
         return True 
@@ -305,4 +304,3 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
-
