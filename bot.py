@@ -1,3 +1,4 @@
+
 import os
 import logging
 import firebase_admin
@@ -5,25 +6,26 @@ import base64
 import json
 from firebase_admin import credentials, firestore
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters # MessageHandler ve filters ekledik
+from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
 
 # --- 1. GÜVENLİ KURULUM ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-WEB_APP_URL = os.environ.get("WEB_APP_URL") # Bu, Render.com'daki oyun arayüzümüzün adresi
+WEB_APP_URL = os.environ.get("WEB_APP_URL") # Bu, oyun arayüzümüzün adresi
 FIREBASE_CREDS_BASE64 = os.environ.get("FIREBASE_CREDS_BASE64")
 
-PORT = int(os.environ.get("PORT", 10000)) # Render.com genellikle 10000 portunu bekler 
-# Render.com servinizin genel URL'si. Bu genellikle Render tarafından otomatik set edilen
-# "RENDER_EXTERNAL_HOSTNAME" gibi bir ortam değişkeninden alınabilir.
-# Eğer bu değişken yoksa, Render paneli üzerinden URL'i alıp elle tanımlamanız gerekecek.
+# Heroku'da PORT ortam değişkeni otomatik ayarlanır.
+# Yerel çalıştırırken varsayılan olarak 8000 kullanılabilir.
+PORT = int(os.environ.get("PORT", 8000))
+
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-WEBHOOK_BASE_URL = os.environ.get("RENDER_EXTERNAL_HOSTNAME") 
-if not WEBHOOK_BASE_URL:
-    logger.warning("RENDER_EXTERNAL_HOSTNAME environment variable not found. Please ensure WEBHOOK_BASE_URL is set correctly in Render.com environment.")
-    # Fallback olarak WEB_APP_URL'i kullanabiliriz ama bu ideal değil
-    WEBHOOK_BASE_URL = WEB_APP_URL.split('?')[0] # Parametreleri kaldır
+# Heroku'da uygulamanızın ana URL'si genellikle HEROKU_APP_NAME üzerinden türetilir
+# veya doğrudan WEBHOOK_BASE_URL olarak ayarlanmalıdır.
+# RENDER_EXTERNAL_HOSTNAME Render.com içindir.
+# En sağlam yol, Heroku'da WEBHOOK_BASE_URL ortam değişkenini manuel olarak ayarlamanızdır.
+# Örneğin: https://peacemissile-bot-app-50391cca531c.herokuapp.com
+WEBHOOK_BASE_URL = os.environ.get("WEBHOOK_BASE_URL")
 
 # Telegram botunuzun webhook path'i için güvenli bir yol oluşturun
 # Bu, Telegram'ın botunuza mesaj göndermek için kullanacağı URL yolu olacak.
@@ -272,11 +274,13 @@ async def show_help(update: Update, context: CallbackContext) -> None:
 
 # --- 3. BOTU BAŞLATMA ---
 def main() -> None:
+    # WEBHOOK_BASE_URL'in kontrolünü ekledik
     if not all([TELEGRAM_TOKEN, WEB_APP_URL, WEBHOOK_BASE_URL, db]):
         logger.error("CRITICAL: Missing environment variables or DB connection failed. Bot will not start.")
         if not TELEGRAM_TOKEN: logger.error("TELEGRAM_TOKEN missing.")
         if not WEB_APP_URL: logger.error("WEB_APP_URL missing.")
-        if not WEBHOOK_BASE_URL: logger.error("WEBHOOK_BASE_URL missing.")
+        # Heroku'da WEBHOOK_BASE_URL'i manuel olarak ayarlamamız gerektiğini hatırlatıyoruz
+        if not WEBHOOK_BASE_URL: logger.error("WEBHOOK_BASE_URL missing. Please set this in Heroku Config Vars to your app's public URL (e.g., https://your-app-name.herokuapp.com).")
         if not db: logger.error("Firebase DB connection failed.")
         return
         
@@ -301,3 +305,4 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
+
