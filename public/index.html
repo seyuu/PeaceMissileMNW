@@ -13,134 +13,40 @@
 <body>
 <div id="phaser-game"></div>
 <script type="text/javascript">
-    
-    // --- Global Değişkenler ve Kurulum ---
-    const tg = window.Telegram.WebApp;
-    const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
-    let db;
+function runGame(tg) {
     try {
-        const firebaseConfig = {
-            apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc",
-            authDomain: "peacemissile-game.firebaseapp.com",
-            projectId: "peacemissile-game",
-            storageBucket: "peacemissile-game.firebasestorage.app",
-            messagingSenderId: "641906716058",
-            appId: "1:641906716058:web:1376e93994fab29f049e23"
-        };
+        const firebaseConfig = { apiKey: "AIzaSyBtOkm8dpjVXLzAXCEB5sL_Awqq4HEeemc", authDomain: "peacemissile-game.firebaseapp.com", projectId: "peacemissile-game", storageBucket: "peacemissile-game.firebasestorage.app", messagingSenderId: "641906716058", appId: "1:641906716058:web:1376e93994fab29f049e23" };
         firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-    } catch (e) {
-        console.error("Firebase initialization failed:", e);
-    }
+        const db = firebase.firestore();
+        const currentUser = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
 
-    class GameScene extends Phaser.Scene {
-        constructor() {
-            super({ key: 'GameScene' });
-        }
-
-        preload() {
-            const urlParams = new URLSearchParams(window.location.search);
-            this.selectedSide = urlParams.get('side') || 'israel';
-            this.load.image('background', `https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/${this.selectedSide}_bg.jpg`);
-            this.load.image('rocket', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/rocket.png');
-            this.load.spritesheet('explosion', 'https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/explosion.gif', { frameWidth: 64, frameHeight: 64 });
-        }
-
-        create() {
-            this.anims.create({ key: 'explode_anim', frames: this.anims.generateFrameNumbers('explosion'), frameRate: 20, repeat: 0, hideOnComplete: true });
-            
-            this.score = 0;
-            this.health = 3;
-            this.isGameOver = false;
-
-            let bg = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, 'background');
-            bg.setDisplaySize(this.cameras.main.width, this.cameras.main.height);
-            
-            this.buildings = this.physics.add.staticGroup();
-            this.buildings.create(this.cameras.main.width / 2, this.cameras.main.height)
-                .setSize(this.cameras.main.width, this.cameras.main.height * 0.20).setOrigin(0.5, 0.8).setVisible(false).refreshBody();
-
-            this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 });
-            this.healthText = this.add.text(this.cameras.main.width - 16, 16, 'Health: 3', { fontSize: '32px', fill: '#fff', stroke: '#000', strokeThickness: 4 }).setOrigin(1, 0);
-
-            this.rockets = this.physics.add.group();
-            this.physics.add.collider(this.rockets, this.buildings, this.hitBuilding, null, this);
-            this.time.addEvent({ delay: 1200, callback: this.spawnRocket, callbackScope: this, loop: true });
-        }
-
-        spawnRocket() { if (this.isGameOver) return; const x = Phaser.Math.Between(40, this.cameras.main.width - 40); const rocket = this.rockets.create(x, -100, 'rocket'); rocket.setAngle(180); rocket.setVelocityY(Phaser.Math.Between(200, 400)); rocket.setInteractive({ useHandCursor: true }); rocket.on('pointerdown', () => this.destroyRocket(rocket)); }
-        
-        destroyRocket(rocket) { if (!rocket.active) return; this.score += 10; this.scoreText.setText('Score: ' + this.score); let explosionSprite = this.add.sprite(rocket.x, rocket.y, 'explosion'); explosionSprite.play('explode_anim'); rocket.destroy(); }
-
-        hitBuilding(rocket, building) {
-            if (!rocket.active) return;
-            this.health -= 1;
-            this.healthText.setText('Health: ' + this.health);
-            let explosionSprite = this.add.sprite(rocket.x, rocket.y + 20, 'explosion').setScale(1.2).setTint(0xff0000);
-            explosionSprite.play('explode_anim');
-            this.cameras.main.shake(100, 0.01);
-            rocket.destroy();
-            if (this.health <= 0) this.gameOver();
-        }
-
-        gameOver() {
-            if (this.isGameOver) return;
-            this.isGameOver = true;
-            this.physics.pause();
-            
-            this.add.rectangle(this.cameras.main.centerX, this.cameras.main.centerY, this.cameras.main.width, this.cameras.main.height, 0, 0.7);
-            this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'GAME OVER\nFinal Score: ' + this.score, { fontSize: '48px', fill: '#ff0000', align: 'center' }).setOrigin(0.5);
-
-            if (currentUser && this.score > 0 && db) {
-                const userDocRef = db.collection('users').doc(String(currentUser.id));
-                userDocRef.get().then(doc => {
-                    if (doc.exists) {
-                        const data = doc.data();
-                        const currentHighest = data.score || 0;
-                        let coinsToAdd = this.score;
-                        if (this.score > currentHighest) {
-                            coinsToAdd += this.score * 100; // Rekor bonusu
-                        }
-                        userDocRef.update({
-                            total_score: firebase.firestore.FieldValue.increment(this.score),
-                            total_pmno_coins: firebase.firestore.FieldValue.increment(coinsToAdd),
-                            score: Math.max(currentHighest, this.score)
-                        });
-                    } else {
-                        // İlk oyun, rekor sayılır
-                        const initialCoins = this.score + (this.score * 100);
-                        userDocRef.set({
-                            score: this.score,
-                            total_score: this.score,
-                            total_pmno_coins: initialCoins,
-                            username: currentUser.username || currentUser.first_name,
-                            user_id: currentUser.id
-                        });
-                    }
-                }).catch(err => {
-                    console.error("Firebase Error:", err);
-                });
+        class Preloader extends Phaser.Scene {
+            constructor() { super({ key: 'Preloader' }); }
+            preload() {
+                this.load.image('lobby_bg', 'assets/lobby_bg.jpg');
+                this.load.image('play_button', 'assets/play_button.png');
+                this.load.image('israel_bg', 'assets/israel_bg.jpg');
+                this.load.image('iran_bg', 'assets/iran_bg.jpg');
+                this.load.image('rocket', 'assets/rocket.png');
+                this.load.image('score_icon', 'assets/score_icon.png');
+                this.load.image('coin_icon', 'assets/coin_icon.png');
+                this.load.spritesheet('explosion', 'assets/explosion.gif', { frameWidth: 64, frameHeight: 64 });
             }
-
-            if (tg) {
-                setTimeout(() => tg.close(), 4000);
-            }
+            create() { this.anims.create({ key: 'explode_anim', frames: this.anims.generateFrameNumbers('explosion'), frameRate: 20, repeat: 0, hideOnComplete: true }); this.scene.start('LobbyScene'); }
         }
+  
+        const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade' }, scene: [Preloader, LobbyScene, GameScene] };
+        new Phaser.Game(config);
+    } catch(e) {
+        document.body.innerHTML = `<h1 style="color:red;">Error: ${e.message}</h1>`;
     }
+}
 
-    const config = { 
-        type: Phaser.AUTO, 
-        width: window.innerWidth, 
-        height: window.innerHeight, 
-        physics: { default: 'arcade' }, 
-        scene: GameScene 
-    };
-    
-    if (window.Telegram && window.Telegram.WebApp) {
-        Telegram.WebApp.ready(() => { new Phaser.Game(config); });
-    } else {
-        window.addEventListener('load', () => { new Phaser.Game(config); });
-    }
+if (window.Telegram && window.Telegram.WebApp) {
+    Telegram.WebApp.ready(runGame);
+} else {
+    window.addEventListener('load', runGame);
+}
 </script>
 </body>
 </html>
