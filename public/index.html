@@ -630,39 +630,26 @@ const playButton = this.add.image(gameWidth / 2, gameHeight * 0.8, 'play_button'
     }
 
     function sendScoreToBot(userId, score) {
-    console.log("sendScoreToBot fonksiyonu çağrıldı. Skor: " + score);
-
-    if (tg && tg.sendData) {
-        console.log("Telegram Web App (tg) objesi bulundu ve sendData metodu mevcut.");
-        try {
+        // Sadece tg objesinin ve sendData metodunun varlığını kontrol et
+        if (tg && tg.sendData) {
+            // Gönderilecek veriyi oluştur
             const data = {
                 type: 'score_update',
-                user_id: String(userId), // ID'yi string olarak gönderelim
+                user_id: String(userId),
                 score: score
             };
-            const jsonData = JSON.stringify(data);
             
-            console.log("Bota gönderilecek veri hazırlanıyor: " + jsonData);
+            // Veriyi JSON formatına çevir ve bota gönder
+            tg.sendData(JSON.stringify(data));
             
-            // VERİYİ GÖNDER
-            tg.sendData(jsonData);
-            
-            console.log("tg.sendData(jsonData) komutu başarıyla çalıştırıldı.");
+            // Tarayıcı konsoluna sadece basit bir onay mesajı yazdır
+            console.log(`Skor (${score}) bota gönderildi.`);
 
-            // Ek olarak, bir uyarı gösterelim
-            tg.showAlert(`Skorunuz (${score}) bota gönderildi!`);
-
-        } catch (error) {
-            console.error("tg.sendData içinde bir HATA oluştu:", error);
-            // Hata olursa da bir uyarı gösterelim
-            tg.showAlert(`Skor gönderilirken bir hata oluştu: ${error.message}`);
+        } else {
+            // Eğer bir sorun varsa, bunu sadece konsola yazdır
+            console.error("HATA: Telegram Web App (tg) objesi veya tg.sendData metodu bulunamadı!");
         }
-    } else {
-        console.error("HATA: Telegram Web App (tg) objesi veya tg.sendData metodu bulunamadı!");
-        // Eğer tg objesi yoksa bunu ekranda göremeyebiliriz ama konsolda görürüz.
-        alert("HATA: Telegram objesi bulunamadı. Skor gönderilemiyor.");
     }
-}
 
 
     const config = { 
