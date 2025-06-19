@@ -188,7 +188,9 @@
             const textFontSize = Math.max(18, Math.floor(gameWidth * 0.03)); // Metin boyutunu dinamik ayarla
 
             this.add.image(gameWidth * 0.35, gameHeight * 0.4, 'score_icon').setScale(iconScale); 
-            this.add.image(gameWidth * 0.35, gameHeight * 0.5, 'coin_icon').setScale(iconScale); 
+            this.add.image(gameWidth * 0.35, gameHeight * 0.5, 'coin_icon').setScale(iconScale);
+            this.add.text(gameWidth * 0.4, gameHeight * 0.4, 'High Score:', { fontSize: `${textFontSize}px`, fill: '#fff' }).setOrigin(0.5);
+            this.add.text(gameWidth * 0.4, gameHeight * 0.5, 'Coins:', { fontSize: `${textFontSize}px`, fill: '#fff' }).setOrigin(0.5);
 
             const highScoreText = this.add.text(gameWidth * 0.6, gameHeight * 0.4, `Loading...`, { fontSize: `${textFontSize}px`, fill: '#fff' }).setOrigin(0.5); 
             const coinsText = this.add.text(gameWidth * 0.6, gameHeight * 0.5, `Loading...`, { fontSize: `${textFontSize}px`, fill: '#fff' }).setOrigin(0.5); 
