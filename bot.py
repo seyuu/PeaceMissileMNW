@@ -90,65 +90,70 @@ async def score(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await update.message.reply_text("No score yet. Use /start to play.")
 
-async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Bu fonksiyon, en son gönderdiğim detaylı "DEBUG" versiyonu.
-    # Sorunu bulana kadar bu şekilde kalması en iyisi.
-    logger.info("[DEBUG] Adım 0: web_app_data_handler tetiklendi.")
-    if not update.effective_message or not update.effective_message.web_app_data:
-        logger.error("[DEBUG] Adım 1 BAŞARISIZ: Etkin mesaj veya web_app_data bulunamadı.")
-        return
+# bot.py'deki web_app_data_handler fonksiyonunun NİHAİ ve DOĞRU hali
 
-    data_str = update.effective_message.web_app_data.data
-    logger.info(f"[DEBUG] Adım 1 BAŞARILI: Ham veri alındı -> {data_str}")
+async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.info("Web App data received, processing...")
 
     try:
-        logger.info("[DEBUG] Adım 2: JSON'a çevirme deneniyor...")
+        data_str = update.effective_message.web_app_data.data
         payload = json.loads(data_str)
-        logger.info(f"[DEBUG] Adım 2 BAŞARILI: JSON'a çevrildi -> {payload}")
         
-        user_id = payload.get("user_id")
-        game_score_str = payload.get("score")
-        logger.info(f"[DEBUG] Adım 3 SONUÇ: user_id={user_id}, game_score_str={game_score_str}")
+        user_id = str(payload.get("user_id"))
+        game_score = int(payload.get("score"))
 
-        if not user_id or game_score_str is None:
-            logger.error("[DEBUG] Adım 3 BAŞARISIZ: user_id veya score alanları eksik.")
+        if not user_id or game_score is None:
+            logger.error(f"Incomplete data from WebApp: {payload}")
             return
-        
-        game_score = int(game_score_str)
-        logger.info(f"[DEBUG] Adım 4 BAŞARILI: Skor integer'a çevrildi -> {game_score}")
-        
-        user_ref = db.collection('users').document(str(user_id))
+
+        # Güvenlik kontrolü
+        if str(update.effective_user.id) != user_id:
+            logger.warning(f"User ID mismatch! TG: {update.effective_user.id}, WA: {user_id}")
+            return
+
+        user_ref = db.collection('users').document(user_id)
         doc = user_ref.get()
-        logger.info(f"[DEBUG] Adım 5 BAŞARILI: Firebase'den belge alındı. Var mı? -> {doc.exists}")
-        
+
         if doc.exists:
             user_data = doc.to_dict()
-            logger.info(f"[DEBUG] Adım 6: Mevcut veriler -> {user_data}")
             
+            # Mevcut değerleri al
             current_high_score = user_data.get('score', 0)
-            if game_score > current_high_score:
-                logger.info(f"[DEBUG] Adım 7: YENİ REKOR!")
-                new_high_score = game_score
-                new_coins = user_data.get('total_pmno_coins', 0) + game_score + (game_score * 100)
-            else:
-                logger.info(f"[DEBUG] Adım 7: Rekor kırılamadı.")
-                new_high_score = current_high_score
-                new_coins = user_data.get('total_pmno_coins', 0) + game_score
-            
-            new_total_score = user_data.get('total_score', 0) + game_score
-            
-            update_data = {'score': new_high_score, 'total_score': new_total_score, 'total_pmno_coins': new_coins}
-            logger.info(f"[DEBUG] Adım 8: Güncellenecek veri -> {update_data}")
-            
-            user_ref.update(update_data)
-            logger.info("[DEBUG] Adım 9 BAŞARILI: Veritabanı güncellendi.")
-            
-            await update.effective_message.reply_text(f"Skorunuz ({game_score}) başarıyla kaydedildi!")
-        else:
-            logger.warning(f"[DEBUG] Adım 6 BAŞARISIZ: Kullanıcı {user_id} DB'de yok.")
-    except Exception as e:
-        logger.error(f"[DEBUG] KRİTİK HATA: {e}", exc_info=True)
+            total_score = user_data.get('total_score', 0)
+            total_coins = user_data.get('total_pmno_coins', 0)
 
+            # Yeni değerleri hesapla
+            total_score += game_score
+            total_coins += game_score # Her oyun için standart coin
+
+            is_new_record = False
+            if game_score > current_high_score:
+                is_new_record = True
+                current_high_score = game_score  # Rekoru güncelle
+                total_coins += game_score * 100 # Rekor bonusunu ekle
+            
+            # Veritabanını güncelle
+            user_ref.update({
+                'score': current_high_score,
+                'total_score': total_score,
+                'total_pmno_coins': total_coins
+            })
+            
+            logger.info(f"User {user_id} score updated successfully. New high score: {current_high_score}")
+
+            # Kullanıcıyı bilgilendir
+            message = f"Tebrikler! {game_score} puanlık oyununuz kaydedildi."
+            if is_new_record:
+                message += f"\n\n🏆 YENİ REKOR: {current_high_score}! 🏆\nBonus olarak {game_score * 100} coin kazandınız!"
+            
+            await update.effective_message.reply_text(message)
+
+        else:
+            logger.warning(f"User {user_id} not found in DB. Should have been created by /start.")
+
+    except Exception as e:
+        logger.error(f"CRITICAL ERROR in web_app_data_handler: {e}", exc_info=True)
+        await update.effective_message.reply_text("Skorunuz işlenirken bir hata oluştu.")
 
 # --- 5. Handler'ları Application'a Ekleme ---
 application.add_handler(CommandHandler("start", start))
