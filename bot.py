@@ -1,11 +1,15 @@
 import os
 import logging
+import time
 import firebase_admin
 import base64
 import json
+import asyncio
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from firebase_admin import credentials, firestore
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
+
 
 # --- 1. GÜVENLİ KURULUM ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -61,7 +65,7 @@ async def web_app_data_handler(update: Update, context: CallbackContext) -> None
     try:
         payload = json.loads(data)
         user_id = payload.get("user_id")
-        final_score = payload.get("final_score")
+        final_score = payload.get("score")
 
         if not user_id or final_score is None:
             logger.error(f"Invalid payload from Web App: {payload}")
@@ -147,8 +151,8 @@ async def start(update: Update, context: CallbackContext) -> None:
     # --- Taraf seçimi butonları burada ---
     keyboard = [
         [
-            InlineKeyboardButton("🇮🇱 Defend Israel", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=israel")),
-            InlineKeyboardButton("🇮🇷 Defend Iran", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=iran"))
+            InlineKeyboardButton("🇮🇱 Defend Israel", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=israel&v={int(time.time())}")),
+            InlineKeyboardButton("🇮🇷 Defend Iran", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=iran&v={int(time.time())}"))
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -269,38 +273,51 @@ async def show_help(update: Update, context: CallbackContext) -> None:
         "Haydi, göreve başlayın!"
     )
     await update.message.reply_text(help_text, parse_mode='Markdown')
+ 
 
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.send_response(200)
+        self.end_headers()
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
 
-# --- 3. BOTU BAŞLATMA ---
-def main() -> None:
-    # WEBHOOK_BASE_URL'in kontrolünü ekledik
+async def main() -> None:
+    """Botu kurar ve başlatır."""
     if not all([TELEGRAM_TOKEN, WEB_APP_URL, WEBHOOK_BASE_URL, db]):
         logger.error("CRITICAL: Missing environment variables or DB connection failed. Bot will not start.")
-        if not TELEGRAM_TOKEN: logger.error("TELEGRAM_TOKEN missing.")
-        if not WEB_APP_URL: logger.error("WEB_APP_URL missing.")
-        # Heroku'da WEBHOOK_BASE_URL'i manuel olarak ayarlamamız gerektiğini hatırlatıyoruz
-        if not WEBHOOK_BASE_URL: logger.error("WEBHOOK_BASE_URL missing. Please set this in Heroku Config Vars to your app's public URL (e.g., https://your-app-name.herokuapp.com).")
-        if not db: logger.error("Firebase DB connection failed.")
         return
-        
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
 
+    # Application'ı oluştur ve webhook'u ayarla
+    application = (
+        Application.builder()
+        .token(TELEGRAM_TOKEN)
+        .updater(None)  # Webhook için Updater'a gerek yok
+        .build()
+    )
+
+    # Handler'ları ekle
+    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("score", score))
-    application.add_handler(CommandHandler("leaderboard", leaderboard)) 
-    application.add_handler(CommandHandler("help", show_help)) 
-    
-    # Web App'ten gelen verileri işlemek için yeni handler
-    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
-    
-    # Telegram bot webhook'unu başlat
-    application.run_webhook(
-        listen="0.0.0.0", 
-        port=PORT,
-        url_path=WEBHOOK_URL_PATH,
-        webhook_url=f"{WEBHOOK_BASE_URL}{WEBHOOK_URL_PATH}" # HTTPS kullanıyoruz
-    )
-    logger.info(f"Bot running with webhook on port {PORT}, URL: {WEBHOOK_BASE_URL}{WEBHOOK_URL_PATH}")
+    application.add_handler(CommandHandler("leaderboard", leaderboard))
+    application.add_handler(CommandHandler("help", show_help))
 
-if __name__ == '__main__':
-    main()
+    # Webhook'u Telegram'a kaydet
+    await application.bot.set_webhook(url=f"{WEBHOOK_BASE_URL}{WEBHOOK_URL_PATH}")
+    
+    # Gelen istekleri dinlemek için basit bir web sunucusu başlat
+    httpd = HTTPServer(("0.0.0.0", PORT), SimpleHTTPRequestHandler)
+    
+    # Web sunucusu ve Telegram bot uygulamasını birlikte çalıştır
+    async with application:
+        logger.info(f"Starting web server on port {PORT}...")
+        await application.start()
+        httpd.serve_forever()
+        await application.stop()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
