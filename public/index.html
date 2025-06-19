@@ -630,18 +630,40 @@ const playButton = this.add.image(gameWidth / 2, gameHeight * 0.8, 'play_button'
     }
 
     function sendScoreToBot(userId, score) {
-        if (tg && tg.sendData) {
+    console.log("sendScoreToBot fonksiyonu çağrıldı. Skor: " + score);
+
+    if (tg && tg.sendData) {
+        console.log("Telegram Web App (tg) objesi bulundu ve sendData metodu mevcut.");
+        try {
             const data = {
                 type: 'score_update',
-                user_id: userId,
+                user_id: String(userId), // ID'yi string olarak gönderelim
                 score: score
             };
-            tg.sendData(JSON.stringify(data));
-            console.log("Score sent to Telegram bot:", data);
-        } else {
-            console.warn("Telegram WebApp sendData mevcut değil.");
+            const jsonData = JSON.stringify(data);
+            
+            console.log("Bota gönderilecek veri hazırlanıyor: " + jsonData);
+            
+            // VERİYİ GÖNDER
+            tg.sendData(jsonData);
+            
+            console.log("tg.sendData(jsonData) komutu başarıyla çalıştırıldı.");
+
+            // Ek olarak, bir uyarı gösterelim
+            tg.showAlert(`Skorunuz (${score}) bota gönderildi!`);
+
+        } catch (error) {
+            console.error("tg.sendData içinde bir HATA oluştu:", error);
+            // Hata olursa da bir uyarı gösterelim
+            tg.showAlert(`Skor gönderilirken bir hata oluştu: ${error.message}`);
         }
+    } else {
+        console.error("HATA: Telegram Web App (tg) objesi veya tg.sendData metodu bulunamadı!");
+        // Eğer tg objesi yoksa bunu ekranda göremeyebiliriz ama konsolda görürüz.
+        alert("HATA: Telegram objesi bulunamadı. Skor gönderilemiyor.");
     }
+}
+
 
     const config = { 
         type: Phaser.AUTO, 
