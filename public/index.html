@@ -605,58 +605,23 @@
             }
         }
 
-        async saveGameScore(score, callback) {
-            if (!db || !currentUser || !currentUser.id) {
-                console.warn("Firebase veya kullanıcı bilgisi mevcut değil, skor kaydedilemiyor.");
-                if (callback) callback(false);
-                return;
-            }
+        // OLMASI GEREKEN DOĞRU KOD (index.html'de)
+async saveGameScore(score, callback) {
+    if (!currentUser || !currentUser.id) {
+        console.warn("Kullanıcı bilgisi yok, skor bota gönderilemiyor.");
+        if (callback) callback(false);
+        return;
+    }
 
-            const userDocRef = db.collection('users').doc(String(currentUser.id));
+    // BURADA FIREBASE KODU OLMAMALI!
+    // Sadece skoru bota gönderiyoruz.
+    sendScoreToBot(currentUser.id, score); 
+    console.log(`Skor (${score}) başarıyla bota gönderildi.`);
 
-            try {
-                console.log("Attempting to save score for user:", currentUser.id, "Score:", score);
-                const doc = await userDocRef.get();
-                let currentHighScore = 0;
-                let totalCoins = 0;
-                let username = currentUser.username || currentUser.first_name || `User${currentUser.id}`;
-
-                if (doc.exists) {
-                    const data = doc.data();
-                    currentHighScore = data.score || 0;
-                    totalCoins = data.total_pmno_coins || 0;
-                    console.log("Existing user data:", data);
-                } else {
-                    console.log("User document does not exist. Initializing with default values.");
-                }
-
-                let isNewHighScore = false;
-                let updateData = {
-                    total_score: firebase.firestore.FieldValue.increment(score) 
-                };
-
-                if (score > currentHighScore) {
-                    isNewHighScore = true;
-                    updateData.score = score; 
-                    updateData.total_pmno_coins = firebase.firestore.FieldValue.increment(score + (100 * score)); 
-                    console.log(`New High Score! Score: ${score}, Old High Score: ${currentHighScore}. Coins to add: ${score + (100 * score)}`);
-                } else {
-                    updateData.total_pmno_coins = firebase.firestore.FieldValue.increment(score); 
-                    console.log(`Not a New High Score. Score: ${score}. Coins to add: ${score}`);
-                }
-
-                updateData.username = username;
-
-                await userDocRef.set(updateData, { merge: true });
-                console.log("Skor ve coinler Firebase'e başarıyla kaydedildi/güncellendi. Güncellenen veriler:", updateData);
-                sendScoreToBot(currentUser.id, score); 
-                if (callback) callback(isNewHighScore);
-
-            } catch (error) {
-                console.error("Skor kaydetme hatası:", error);
-                if (callback) callback(false);
-            }
-        }
+    // Bu callback, sadece oyunun "Game Over" animasyonunu tetiklemek için var.
+    // Rekor olup olmadığını artık oyunun bilmesine gerek yok.
+    if (callback) callback(false);
+}
     }
 
     function sendScoreToBot(userId, score) {
