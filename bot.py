@@ -124,13 +124,21 @@ def health_check():
     """Heroku'nun sağlık kontrolü için."""
     return {"status": "ok, bot is running"}
 
-# Bu yapı, uvicorn tarafından çağrıldığında application'ı başlatır.
-async def main():
+# --- 5. Uygulamanın Başlangıç ve Bitiş Olayları (Lifespan) ---
+
+@api.on_event("startup")
+async def on_startup():
+    """Uygulama başladığında webhook'u ayarlar."""
     await application.initialize()
     await application.start()
-    
-if __name__ == "bot":
-    application.run_polling() # Yerel test için
-elif __name__ == "__main__":
-    # Bu kısım doğrudan çalıştırılmayacak, uvicorn tarafından yönetilecek
-    pass
+    await application.bot.set_webhook(url=f"{WEBHOOK_BASE_URL}{WEBHOOK_URL_PATH}")
+    logger.info("Application startup complete and webhook is set.")
+
+
+@api.on_event("shutdown")
+async def on_shutdown():
+    """Uygulama kapandığında webhook'u kaldırır ve botu durdurur."""
+    logger.info("Application shutdown, deleting webhook...")
+    await application.stop()
+    await application.bot.delete_webhook()
+    await application.shutdown()
