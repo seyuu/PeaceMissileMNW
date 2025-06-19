@@ -173,11 +173,13 @@
             }).setOrigin(0.5);
 
             // Play butonu - Ölçeği ekran genişliğine göre ayarla
-            const playButtonScale = Math.min(1.0, gameWidth / this.textures.get('play_button').width * 0.7); // Genişliğin %70'ine kadar sığdır
-            const playButton = this.add.image(gameWidth / 2, gameHeight * 0.8, 'play_button')
-                .setScale(playButtonScale) 
-                .setInteractive({ useHandCursor: true })
-                .setDepth(2);
+            const playButtonTexture = this.textures.get('play_button');
+const playButtonWidth = playButtonTexture.getSourceImage().width;
+const playButtonScale = Math.min(1.0, (gameWidth * 0.7) / playButtonWidth);
+const playButton = this.add.image(gameWidth / 2, gameHeight * 0.8, 'play_button')
+    .setScale(playButtonScale)
+    .setInteractive({ useHandCursor: true })
+    .setDepth(2);
 
             playButton.on('pointerdown', () => {
                 this.scene.start('GameScene');
