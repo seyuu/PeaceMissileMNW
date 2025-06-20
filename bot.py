@@ -1,323 +1,164 @@
 import os
 import logging
+import json
+import base64
 import time
 import firebase_admin
-import base64
-import json
-import asyncio
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from firebase_admin import credentials, firestore
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
-
-# --- 1. GÜVENLİ KURULUM ---
+# --- Ortam değişkenleri ve ayar ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-WEB_APP_URL = os.environ.get("WEB_APP_URL") # Bu, oyun arayüzümüzün adresi
+WEB_APP_URL = os.environ.get("WEB_APP_URL")
+WEBHOOK_BASE_URL = os.environ.get("WEBHOOK_BASE_URL")
 FIREBASE_CREDS_BASE64 = os.environ.get("FIREBASE_CREDS_BASE64")
-
-# Heroku'da PORT ortam değişkeni otomatik ayarlanır.
-# Yerel çalıştırırken varsayılan olarak 8000 kullanılabilir.
 PORT = int(os.environ.get("PORT", 8000))
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
+# --- Logger ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("PMNOFO-BOT")
 
-# Heroku'da uygulamanızın ana URL'si genellikle HEROKU_APP_NAME üzerinden türetilir
-# veya doğrudan WEBHOOK_BASE_URL olarak ayarlanmalıdır.
-# RENDER_EXTERNAL_HOSTNAME Render.com içindir.
-# En sağlam yol, Heroku'da WEBHOOK_BASE_URL ortam değişkenini manuel olarak ayarlamanızdır.
-# Örneğin: https://peacemissile-bot-app-50391cca531c.herokuapp.com
-WEBHOOK_BASE_URL = os.environ.get("WEBHOOK_BASE_URL")
+# --- Firebase Bağlantısı ---
+if FIREBASE_CREDS_BASE64:
+    creds_json = json.loads(base64.b64decode(FIREBASE_CREDS_BASE64))
+    cred = credentials.Certificate(creds_json)
+else:
+    cred = credentials.Certificate("firebase-key.json")
 
-# Telegram botunuzun webhook path'i için güvenli bir yol oluşturun
-# Bu, Telegram'ın botunuza mesaj göndermek için kullanacağı URL yolu olacak.
-# Genellikle Telegram tokenı kullanılır.
-WEBHOOK_URL_PATH = f"/{TELEGRAM_TOKEN}"
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
-db = None
-try:
-    if FIREBASE_CREDS_BASE64:
-        decoded_creds = base64.b64decode(FIREBASE_CREDS_BASE64)
-        cred_json = json.loads(decoded_creds)
-        cred = credentials.Certificate(cred_json)
-        logger.info("Firebase credentials loaded from environment variable.")
-    else:
-        cred = credentials.Certificate("firebase-key.json")
-        logger.info("Firebase credentials loaded from local file.")
-    
-    firebase_admin.initialize_app(cred)
-    db = firestore.client()
-    logger.info("Firebase connection successful.")
-except Exception as e:
-    logger.error(f"FATAL: Could not initialize Firebase: {e}")
-
-# --- WEB APP'TEN GELEN VERİLERİ İŞLEME FONKSİYONU ---
-async def web_app_data_handler(update: Update, context: CallbackContext) -> None:
-    """Web App'ten gelen verileri (örn. oyun skoru) işler."""
-    if not update.effective_message or not update.effective_message.web_app_data:
-        logger.warning("No web app data received or effective message is missing.")
-        return
-
-    data = update.effective_message.web_app_data.data
-    logger.info(f"Received Web App Data: {data}")
-
-    try:
-        payload = json.loads(data)
-        user_id = payload.get("user_id")
-        final_score = payload.get("score")
-
-        if not user_id or final_score is None:
-            logger.error(f"Invalid payload from Web App: {payload}")
-            await update.effective_message.reply_text("Oyun skoru alınamadı, lütfen tekrar deneyin.")
-            return
-
-        final_score = int(final_score)
-        
-        # Kullanıcının Telegram ID'si (update.effective_user.id) ile Web App'ten gelen user_id'yi karşılaştırabiliriz
-        # Güvenlik için bu önemli. Eğer oyun içinde user_id'yi kendiniz set ediyorsanız,
-        # burada update.effective_user.id'yi kullanmanız daha güvenlidir.
-        telegram_user_id = str(update.effective_user.id)
-        if telegram_user_id != str(user_id):
-            logger.warning(f"User ID mismatch: Telegram ({telegram_user_id}) vs Web App ({user_id})")
-            await update.effective_message.reply_text("Kullanıcı ID doğrulaması başarısız oldu. Güvenlik hatası.")
-            return
-
-        success = await update_user_score(telegram_user_id, final_score)
-        
-        if success:
-            await update.effective_message.reply_text(
-                f"Tebrikler! Yeni skorunuz {final_score} kaydedildi.\n"
-                f"Güncel istatistiklerinizi görmek için /score yazın."
-            )
-        else:
-            await update.effective_message.reply_text("Skorunuz kaydedilirken bir sorun oluştu. Lütfen tekrar deneyin.")
-
-    except json.JSONDecodeError:
-        logger.error(f"Failed to decode JSON from Web App Data: {data}")
-        await update.effective_message.reply_text("Oyun verisi okunamadı.")
-    except ValueError:
-        logger.error(f"Invalid score value from Web App: {final_score}")
-        await update.effective_message.reply_text("Geçersiz skor değeri alındı.")
-    except Exception as e:
-        logger.error(f"Unhandled error in web_app_data_handler: {e}")
-        await update.effective_message.reply_text("Bir hata oluştu, lütfen yöneticinizle iletişime geçin.")
-
-
-# --- 2. BOT FONKSİYONLARI (önceki haliyle aynı, sadece kopyalayıp yapıştırın) ---
-
-async def start(update: Update, context: CallbackContext) -> None:
-    """/start komutuna cevap verir ve taraf seçimi butonlarını gönderir."""
-    if not db:
-        await update.message.reply_text("Database connection error. Please contact admin.")
-        return
-
+# --- Başlangıç Komutu ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     user_ref = db.collection('users').document(str(user.id))
-
-    # Kullanıcının belgesini kontrol et
-    user_doc = user_ref.get()
-
-    if not user_doc.exists: # Kullanıcı yoksa, yeni belge oluştur
+    if not user_ref.get().exists:
         user_data = {
             'username': user.username or user.first_name,
-            'first_name': user.first_name,
-            'score': 0, # En yüksek tekil oyun skoru (mevcut bu)
-            'total_score': 0, # Yeni: Tüm oyunların toplam skoru
-            'total_pmno_coins': 0, # Yeni: Toplam PMNOFO Coin
+            'score': 0,
+            'total_score': 0,
+            'total_pmno_coins': 0,
             'user_id': user.id
         }
         user_ref.set(user_data)
-        logger.info(f"New user created in Firestore: {user.username or user.first_name} with initial scores.")
-    else:
-        # Kullanıcı zaten varsa, mevcut verilerini güncelleme veya kontrol etme
-        existing_data = user_doc.to_dict()
-        update_needed = False
-        if 'total_score' not in existing_data:
-            existing_data['total_score'] = 0
-            update_needed = True
-        if 'total_pmno_coins' not in existing_data:
-            existing_data['total_pmno_coins'] = 0
-            update_needed = True
-        if 'score' not in existing_data: 
-            existing_data['score'] = 0
-            update_needed = True
 
-        if update_needed:
-            user_ref.update(existing_data)
-            logger.info(f"Existing user {user.username or user.first_name} updated with missing score/coin fields.")
-
-
-    # --- Taraf seçimi butonları burada ---
     keyboard = [
         [
-            InlineKeyboardButton("🇮🇱 Defend Israel", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=israel&v={int(time.time())}")),
-            InlineKeyboardButton("🇮🇷 Defend Iran", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=iran&v={int(time.time())}"))
+            InlineKeyboardButton("🇮🇱 Defend Israel", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=israel")),
+            InlineKeyboardButton("🇮🇷 Defend Iran", web_app=WebAppInfo(url=f"{WEB_APP_URL}?side=iran"))
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    photo_url = "https://raw.githubusercontent.com/seyuu/PeaceMissileBot/main/public/assets/logo.png"
-    
-    await update.message.reply_photo(
-        photo=photo_url,
-        caption=f"Welcome, Peace Ambassador {user.first_name}!\n\n"
-                "The skies are filled with conflict. Choose a side to defend and turn rockets into doves of peace. Your mission starts now.\n\n"
-                "Oyunun amacı ve coin kazanma hakkında bilgi almak için /help komutunu kullanın.",
+    await update.message.reply_text(
+        "Taraf seçin ve oyuna başlayın!\nDaha fazla bilgi için /help yazın.",
         reply_markup=reply_markup
     )
 
-async def score(update: Update, context: CallbackContext) -> None:
-    """Kullanıcının skorunu gösterir."""
-    if not db:
-        await update.message.reply_text("Database connection error.")
-        return
+# --- Yardım Komutu ---
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🕊️ Füzeleri güvercine çevir, binaları koru!\n"
+        "Her yeni skorunu oyun sonunda bize gönder.\n"
+        "Rekorunu kırarsan bonus coin ve puan kazanırsın!\n"
+        "Komutlar:\n/score - Skorunu gör\n/leaderboard - En iyiler"
+    )
 
+# --- Skor Komutu ---
+async def score(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.message.from_user.id)
-    user_doc = db.collection('users').document(user_id).get()
+    doc = db.collection('users').document(user_id).get()
+    if not doc.exists:
+        await update.message.reply_text("Henüz hiç oynamadın. /start ile başla!")
+        return
+    d = doc.to_dict()
+    await update.message.reply_text(
+        f"En Yüksek Skorun: {d.get('score',0)} 🏆\n"
+        f"Toplam Skorun: {d.get('total_score',0)} ☮️\n"
+        f"Toplam PMNOFO Coin: {d.get('total_pmno_coins',0)} 💰"
+    )
 
-    if user_doc.exists:
-        user_data = user_doc.to_dict()
-        current_highest_score = user_data.get('score', 0) 
-        total_accumulated_score = user_data.get('total_score', 0) 
-        total_pmno_coins = user_data.get('total_pmno_coins', 0) 
+# --- Leaderboard Komutu ---
+async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    docs = db.collection('users').order_by('total_score', direction=firestore.Query.DESCENDING).limit(10).stream()
+    txt = "🏆 **PMNOFO Leaderboard** 🏆\n\n"
+    for i, doc in enumerate(docs, 1):
+        d = doc.to_dict()
+        name = d.get('username') or "Anon"
+        txt += f"{i}. {name} - {d.get('total_score',0)} ☮️\n"
+    await update.message.reply_text(txt)
 
-        await update.message.reply_text(
-            f"Your stats, Peace Ambassador:\n"
-            f"Current Highest Game Score: {current_highest_score} 🏆\n"
-            f"Total Accumulated Score: {total_accumulated_score} ☮️\n"
-            f"Total PMNOFO Coins: {total_pmno_coins} 💰"
-        )
-    else:
-        await update.message.reply_text("You haven't played yet! Use /start to begin.")
+# --- WebApp Skor POST Handler ---
+async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_message or not update.effective_message.web_app_data:
+        return
+    try:
+        data = json.loads(update.effective_message.web_app_data.data)
+        user_id = str(data.get("user_id"))
+        score = int(data.get("score", 0))
+        if str(update.effective_user.id) != user_id:
+            await update.effective_message.reply_text("Kullanıcı doğrulama hatası!")
+            return
+        ok = update_user_score(user_id, score)
+        if ok:
+            await update.effective_message.reply_text(f"Skorun kaydedildi: {score}")
+        else:
+            await update.effective_message.reply_text("Kayıt hatası, lütfen /start ile tekrar başla.")
+    except Exception as e:
+        logger.error("Skor kaydı hata: %s", e)
+        await update.effective_message.reply_text("Bir hata oluştu, yöneticinize haber verin.")
 
-async def update_user_score(user_id: str, new_game_score: int):
-    """Web App'ten gelen skorları işler ve Firebase'i günceller."""
-    if not db:
-        logger.error("Database connection error in update_user_score.")
-        return False 
+# --- Skor Güncelleme (Hesaplamalar burada) ---
+def update_user_score(user_id, new_score):
+    try:
+        ref = db.collection('users').document(user_id)
+        doc = ref.get()
+        if not doc.exists:
+            return False
+        d = doc.to_dict()
+        current_max = d.get('score', 0)
+        total = d.get('total_score', 0)
+        bonus = 0
 
-    user_ref = db.collection('users').document(user_id)
-    user_doc = user_ref.get()
+        # Kişisel rekor kontrolü
+        broke_personal = new_score > current_max
 
-    if user_doc.exists:
-        user_data = user_doc.to_dict()
-        
-        current_highest_score = user_data.get('score', 0) 
-        total_accumulated_score = user_data.get('total_score', 0) 
-        total_pmno_coins = user_data.get('total_pmno_coins', 0) 
+        # Leaderboard rekoru
+        leaderboard_max = 0
+        for doc2 in db.collection('users').order_by('score', direction=firestore.Query.DESCENDING).limit(1).stream():
+            leaderboard_max = doc2.to_dict().get('score', 0)
+        broke_leaderboard = new_score > leaderboard_max
 
-        # 1. Her oyun için puanları toplam puana ekle
-        total_accumulated_score += new_game_score
+        # Skor ekle
+        total += new_score
+        if broke_personal:
+            current_max = new_score
+            bonus += new_score * 100
+        if broke_leaderboard:
+            bonus += new_score * 250
 
-        # 2. Her oyun için puan kadar coin ekle
-        total_pmno_coins += new_game_score
+        total_with_bonus = total + bonus
+        total_coins = total_with_bonus * 10
 
-        # 3. Yeni rekor kırıldıysa bonus coin ekle
-        if new_game_score > current_highest_score:
-            coin_bonus = new_game_score * 100
-            total_pmno_coins += coin_bonus
-            current_highest_score = new_game_score # En yüksek skoru güncelle
-
-        # Firebase'i güncelle
-        user_ref.update({
-            'score': current_highest_score,        # Tekil oyun en yüksek skoru
-            'total_score': total_accumulated_score, # Tüm oyunların toplam skoru
-            'total_pmno_coins': total_pmno_coins  # Toplam PMNOFO Coin
+        ref.update({
+            'score': current_max,
+            'total_score': total_with_bonus,
+            'total_pmno_coins': total_coins
         })
-        logger.info(f"User {user_id} scores updated. New highest: {current_highest_score}, Total Score: {total_accumulated_score}, Total Coins: {total_pmno_coins}")
-        return True 
-    else:
-        logger.warning(f"User {user_id} not found when trying to update score. User must /start first.")
-        return False 
+        return True
+    except Exception as e:
+        logger.error("update_user_score hata: %s", e)
+        return False
 
-
-async def leaderboard(update: Update, context: CallbackContext) -> None:
-    """Genel liderlik tablosunu gösterir."""
-    if not db:
-        await update.message.reply_text("Database connection error.")
-        return
-
-    users_ref = db.collection('users').order_by('total_score', direction=firestore.Query.DESCENDING).limit(10)
-
-    docs = users_ref.stream()
-
-    leaderboard_text = "🏆 **Global Peace Leaderboard (Toplam Puan)** 🏆\n\n"
-    position = 1
-    for doc in docs:
-        user_data = doc.to_dict()
-        username = user_data.get('username') or user_data.get('first_name', 'Bilinmeyen Kullanıcı')
-        total_score = user_data.get('total_score', 0)
-        leaderboard_text += f"{position}. {username} - {total_score} ☮️\n"
-        position += 1
-    
-    if position == 1: 
-        leaderboard_text += "Henüz kimse oynamamış! İlk sen ol!"
-
-    await update.message.reply_text(leaderboard_text, parse_mode='Markdown')
-
-async def show_help(update: Update, context: CallbackContext) -> None:
-    """Oyunun amacını ve kurallarını açıklar."""
-    help_text = (
-        "🕊️ **Barış Füzesi Botuna Hoş Geldiniz!** 🕊️\n\n"
-        "Bu oyunda amacınız, gökyüzündeki füzeleri barış güvercinlerine dönüştürerek "
-        "dünyaya barış getirmek. Her başarılı dönüşüm size puan kazandırır.\n\n"
-        "💰 **PMNOFO Coini Nasıl Kazanılır?**\n"
-        "Her oynadığınız oyunda kazandığınız puan kadar PMNOFO Coini hesabınıza eklenir. "
-        "Ayrıca, eğer yeni bir kişisel rekor kırarsanız, kırdığınız rekor puanının "
-        "**100 katı** kadar devasa bir bonus PMNOFO Coini kazanırsınız! Unutmayın, rekorlar kırın, daha çok coin toplayın!\n\n"
-        "📊 **Genel Liderlik Tablosu**\n"
-        "En yüksek toplam puana veya en çok PMNOFO Coini'ne sahip oyuncuları görmek için "
-        "`/leaderboard` komutunu kullanın. Adınızı zirveye taşıyın!\n\n"
-        "📢 **Unutmayın:** Her bir puanınız, dünyaya bir adım daha fazla barış getirme çabanızı temsil ediyor. "
-        "Haydi, göreve başlayın!"
-    )
-    await update.message.reply_text(help_text, parse_mode='Markdown')
- 
-
-class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        self.send_response(200)
-        self.end_headers()
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is running!")
-
-async def main() -> None:
-    """Botu kurar ve başlatır."""
-    if not all([TELEGRAM_TOKEN, WEB_APP_URL, WEBHOOK_BASE_URL, db]):
-        logger.error("CRITICAL: Missing environment variables or DB connection failed. Bot will not start.")
-        return
-
-    # Application'ı oluştur ve webhook'u ayarla
-    application = (
-        Application.builder()
-        .token(TELEGRAM_TOKEN)
-        .updater(None)  # Webhook için Updater'a gerek yok
-        .build()
-    )
-
-    # Handler'ları ekle
-    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("score", score))
-    application.add_handler(CommandHandler("leaderboard", leaderboard))
-    application.add_handler(CommandHandler("help", show_help))
-
-    # Webhook'u Telegram'a kaydet
-    await application.bot.set_webhook(url=f"{WEBHOOK_BASE_URL}{WEBHOOK_URL_PATH}")
-    
-    # Gelen istekleri dinlemek için basit bir web sunucusu başlat
-    httpd = HTTPServer(("0.0.0.0", PORT), SimpleHTTPRequestHandler)
-    
-    # Web sunucusu ve Telegram bot uygulamasını birlikte çalıştır
-    async with application:
-        logger.info(f"Starting web server on port {PORT}...")
-        await application.start()
-        httpd.serve_forever()
-        await application.stop()
-
+# --- Main ---
+def main():
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("score", score))
+    app.add_handler(CommandHandler("leaderboard", leaderboard))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
+    app.run_polling() # Webhook gerekiyorsa run_polling yerine webhook fonksiyonu koyabilirsin.
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
