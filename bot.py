@@ -155,8 +155,8 @@ async def main():
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("score", score))
     app.add_handler(CommandHandler("leaderboard", leaderboard))
-    app.add_handler(MessageHandler(filters.WEB_APP_DATA, web_app_data_handler))
-
+    #app.add_handler(MessageHandler(filters.WEB_APP_DATA, web_app_data_handler))
+    app.add_handler(MessageHandler(filters.TEXT, web_app_data_handler))
     webhook_path = f"/{TELEGRAM_TOKEN}"
     webhook_url = f"{WEBHOOK_BASE_URL.rstrip('/')}{webhook_path}"
 
