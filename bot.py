@@ -24,4 +24,5 @@ def main():
     )
 
 if __name__ == "__main__":
+    # main'i doğrudan çağırın. Application.run_webhook olay döngüsünü halledecektir.
     main()
