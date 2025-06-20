@@ -2,11 +2,13 @@ import os
 import logging
 import json
 import base64
-import time
 import firebase_admin
 from firebase_admin import credentials, firestore
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import asyncio
+
 
 # --- Ortam değişkenleri ve ayar ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -160,14 +162,32 @@ def update_user_score(user_id, new_score):
         return False
 
 # --- Main ---
-def main():
+async def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("score", score))
     app.add_handler(CommandHandler("leaderboard", leaderboard))
-    app.add_handler(MessageHandler(filters.WEB_APP_DATA, web_app_data_handler))
-    app.run_polling() # Webhook gerekiyorsa run_polling yerine webhook fonksiyonu koyabilirsin.
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
+
+    webhook_path = f"/{TELEGRAM_TOKEN}"
+    webhook_url = f"{WEBHOOK_BASE_URL}{webhook_path}"
+
+    await app.bot.set_webhook(webhook_url)
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"OK")
+
+    httpd = HTTPServer(("0.0.0.0", PORT), HealthHandler)
+
+    async with app:
+        print(f"Listening on {PORT}")
+        await app.start()
+        httpd.serve_forever()
+        await app.stop()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
