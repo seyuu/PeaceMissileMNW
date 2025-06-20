@@ -1,32 +1,15 @@
-from flask import Flask, request
-from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, filters
 import os
+from telegram.ext import Application, CommandHandler
 
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-bot = Bot(token=TOKEN)
-app = Flask(__name__)
+async def start(update, context):
+    await update.message.reply_text('Hello!')
 
-# dispatcher ile handler'ları kaydet
-dispatcher = Dispatcher(bot, None, workers=0)
-
-def start(update, context):
-    update.message.reply_text('Peace Missile Bot aktif!')
-
-dispatcher.add_handler(CommandHandler("start", start))
-
-@app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
-    return "ok"
-
-@app.route("/", methods=["GET"])
-def index():
-    return "Bot Çalışıyor"
+app = Application.builder().token("7620538088:AAGCKXgtDrzfg2jUnAY4WYp9rgwxNy6oOOE").build()
+app.add_handler(CommandHandler("start", start))
 
 if __name__ == "__main__":
-    # Set webhook on deploy
-    url = os.getenv("WEBHOOK_BASE_URL")  # örn: https://peacemissile-bot-app-xxxx.herokuapp.com
-    bot.set_webhook(f"{url}/{TOKEN}")
-    app.run(port=5000, debug=True)
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        webhook_url="https://peacemissile-bot-app-50391cca531c.herokuapp.com/7620538088:AAGCKXgtDrzfg2jUnAY4WYp9rgwxNy6oOOE"
+    )
