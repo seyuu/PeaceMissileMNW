@@ -14,6 +14,5 @@ if __name__ == "__main__":
     app.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
-        webhook_url=f"https://peacemissile-bot-app-50391cca531c.herokuapp.com/{TOKEN}",
-        webhook_path=f"/{TOKEN}"
+        webhook_url=f"https://peacemissile-bot-app-50391cca531c.herokuapp.com/{TOKEN}"        
     )
