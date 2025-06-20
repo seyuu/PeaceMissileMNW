@@ -92,10 +92,13 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_message or not update.effective_message.web_app_data:
         return
+
     try:
         data = json.loads(update.effective_message.web_app_data.data)
+        logger.info("GELEN DATA: %s", data)  # LOG!
         user_id = str(data.get("user_id"))
         score = int(data.get("score", 0))
+        # (Eğer logda burada None veya 0 görüyorsan, sorun JS tarafında!)
         if str(update.effective_user.id) != user_id:
             await update.effective_message.reply_text("Kullanıcı doğrulama hatası!")
             return
@@ -111,9 +114,11 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 # --- Skor Güncelleme (Hesaplamalar burada) ---
 def update_user_score(user_id, new_score):
     try:
+        logger.info(f"update_user_score called: user_id={user_id}, new_score={new_score}")
         ref = db.collection('users').document(user_id)
         doc = ref.get()
         if not doc.exists:
+            logger.error(f"User {user_id} not found in Firestore!")
             return False
         d = doc.to_dict()
         current_max = d.get('score', 0)
@@ -140,11 +145,15 @@ def update_user_score(user_id, new_score):
         total_with_bonus = total + bonus
         total_coins = total_with_bonus * 10
 
+        
+        logger.info(f"UPDATE -- user:{user_id}, score:{current_max}, total:{total_with_bonus}, coins:{total_coins}")
+
         ref.update({
             'score': current_max,
             'total_score': total_with_bonus,
             'total_pmno_coins': total_coins
         })
+        logger.info("FIRESTORE UPDATE OK")
         return True
     except Exception as e:
         logger.error("update_user_score hata: %s", e)
@@ -157,7 +166,7 @@ def main():
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("score", score))
     app.add_handler(CommandHandler("leaderboard", leaderboard))
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
+    app.add_handler(MessageHandler(filters.WEB_APP_DATA, web_app_data_handler))
     app.run_polling() # Webhook gerekiyorsa run_polling yerine webhook fonksiyonu koyabilirsin.
 
 if __name__ == "__main__":
