@@ -10,13 +10,12 @@ WEBHOOK_PATH = f"/{TOKEN}"
 WEBHOOK_URL = f"{WEBHOOK_BASE_URL}{WEBHOOK_PATH}"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Peace Missile Game Bot Online!")
+    await update.message.reply_text("Peace Missile Game Bot Online! Oyunu oynamak için aşağıdaki bağlantıya tıkla:\nhttps://peacemissile-game-ui.onrender.com")
 
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
 
-    # Sadece webhook_url parametresi! Başka bir şey verme!
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
@@ -24,5 +23,4 @@ def main():
     )
 
 if __name__ == "__main__":
-    # main'i doğrudan çağırın. Application.run_webhook olay döngüsünü halledecektir.
     main()
