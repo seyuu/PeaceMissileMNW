@@ -1,7 +1,13 @@
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
+ 
+import base64
 
+# Heroku'da ortam değişkeninden anahtar dosyası oluştur
+if os.environ.get("FIREBASE_CREDS_BASE64"):
+    with open("firebase-key.json", "w") as f:
+        f.write(base64.b64decode(os.environ["FIREBASE_CREDS_BASE64"]).decode())
 TOKEN = os.environ.get("TELEGRAM_TOKEN") or "7620538088:AAGCKXgtDrzfg2jUnAY4WYp9rgwxNy6oOOE"
 PORT = int(os.environ.get("PORT", 8000))
 

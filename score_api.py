@@ -1,7 +1,13 @@
 import os
+import base64
 from flask import Flask, request
 import firebase_admin
 from firebase_admin import credentials, firestore
+
+# Ortam değişkeninden firebase anahtar dosyası oluştur
+if os.environ.get("FIREBASE_CREDS_BASE64"):
+    with open("firebase-key.json", "w") as f:
+        f.write(base64.b64decode(os.environ["FIREBASE_CREDS_BASE64"]).decode())
 
 cred = credentials.Certificate("firebase-key.json")
 if not firebase_admin._apps:
