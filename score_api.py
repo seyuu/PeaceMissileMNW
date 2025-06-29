@@ -24,21 +24,28 @@ def save_score():
     username = data.get("username", "Player")
 
     user_ref = db.collection("users").document(user_id)
-    user = user_ref.get().to_dict()
-    total_score = score
-    total_pmno_coins = score
+    user = user_ref.get().to_dict() or {}
 
-    # Varsa toplam skorları ekle
-    if user:
-        total_score += user.get("total_score", 0)
-        total_pmno_coins += user.get("total_pmno_coins", 0)
+    prev_max = user.get("score", 0)
+    prev_total = user.get("total_score", 0)
+    prev_coins = user.get("total_pmno_coins", 0)
 
-    # Kayıt et
+    # MAX skor ve toplam skor güncellemesi
+    new_max_score = max(prev_max, score)
+    new_total_score = prev_total + score
+    new_total_coins = prev_coins + score
+
+    # DEBUG LOG
+    print(f"[LOG] user_id={user_id}, score={score}, username={username}")
+    print(f"[LOG] prev_max={prev_max}, prev_total={prev_total}, prev_coins={prev_coins}")
+    print(f"[LOG] new_max_score={new_max_score}, new_total_score={new_total_score}, new_total_coins={new_total_coins}")
+
+    # Firebase'e yaz
     user_ref.set({
         "username": username,
-        "score": max(user.get("score", 0) if user else 0, score),
-        "total_score": total_score,
-        "total_pmno_coins": total_pmno_coins
+        "score": new_max_score,                # MAX skor (hiçbir zaman azalmaz)
+        "total_score": new_total_score,        # Tüm oyunların toplamı
+        "total_pmno_coins": new_total_coins    # Tüm oyunların toplamı (ayrıca bonuslar ekleyebilirsin)
     }, merge=True)
     return "OK", 200
 
