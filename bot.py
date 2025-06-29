@@ -5,8 +5,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes, Dispatcher, MessageHandler, filters
-from telegram.ext import WebhookHandler
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 import threading
 
@@ -72,7 +71,6 @@ def root():
 # --------------- Telegram Webhook Endpoint ---------------
 @app.route(WEBHOOK_PATH, methods=["POST"])
 def telegram_webhook():
-    """Telegram Webhook endpointi"""
     update = Update.de_json(request.get_json(force=True), application.bot)
     application.update_queue.put(update)
     return "OK", 200
@@ -83,10 +81,9 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    # Set webhook
+    # Webhook'u ayarla
     import asyncio
     asyncio.get_event_loop().run_until_complete(application.bot.set_webhook(WEBHOOK_URL))
 
-    # Flask ve Telegram handler aynı processte çalışacak
-    threading.Thread(target=run_flask).start()
-    application.run_polling(stop_signals=None)  # polling yerine sadece update_queue ile çalışacak
+    # Flask server başlat
+    run_flask()
