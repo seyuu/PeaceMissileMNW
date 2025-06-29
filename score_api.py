@@ -4,7 +4,7 @@ from flask import Flask, request
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Ortam değişkeninden firebase anahtar dosyası oluştur
+# Ortamdan firebase anahtarı al, yoksa local dosya
 if os.environ.get("FIREBASE_CREDS_BASE64"):
     with open("firebase-key.json", "w") as f:
         f.write(base64.b64decode(os.environ["FIREBASE_CREDS_BASE64"]).decode())
@@ -22,9 +22,23 @@ def save_score():
     user_id = str(data.get("user_id"))
     score = int(data.get("score", 0))
     username = data.get("username", "Player")
-    db.collection("users").document(user_id).set({
+
+    user_ref = db.collection("users").document(user_id)
+    user = user_ref.get().to_dict()
+    total_score = score
+    total_pmno_coins = score
+
+    # Varsa toplam skorları ekle
+    if user:
+        total_score += user.get("total_score", 0)
+        total_pmno_coins += user.get("total_pmno_coins", 0)
+
+    # Kayıt et
+    user_ref.set({
         "username": username,
-        "score": score,
+        "score": max(user.get("score", 0) if user else 0, score),
+        "total_score": total_score,
+        "total_pmno_coins": total_pmno_coins
     }, merge=True)
     return "OK", 200
 
