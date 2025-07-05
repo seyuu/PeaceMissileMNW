@@ -15,18 +15,18 @@ Telegram WebApp oyunu - Füzeleri güvercinlere çevirerek barış getirin!
 ### Google Cloud Run (Bot Backend)
 
 1. **Ortam Değişkenleri**:
-```bash
-TELEGRAM_TOKEN=your_bot_token
-WEB_APP_URL=https://your-game-url.onrender.com
-SERVER_URL=https://your-bot-url.run.app
-FIREBASE_CREDS_BASE64=your_base64_firebase_creds
-```
+   ```bash
+   TELEGRAM_TOKEN=your_bot_token
+   WEB_APP_URL=https://your-game-url.onrender.com
+   SERVER_URL=https://your-bot-url.run.app
+   FIREBASE_CREDS_BASE64=your_base64_firebase_creds
+   ```
 
 2. **Deploy**:
-```bash
-gcloud builds submit --tag gcr.io/PROJECT_ID/peacebot
-gcloud run deploy peacebot --image gcr.io/PROJECT_ID/peacebot --platform managed --region europe-central2 --allow-unauthenticated
-```
+   ```bash
+   gcloud builds submit --tag gcr.io/PROJECT_ID/peacebot
+   gcloud run deploy peacebot --image gcr.io/PROJECT_ID/peacebot --platform managed --region europe-central2 --allow-unauthenticated
+   ```
 
 ### Render (Game Frontend)
 
