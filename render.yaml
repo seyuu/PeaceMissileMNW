@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: peacemissile-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app --bind 0.0.0.0:$PORT --workers 1 --threads 2
+    envVars:
+      - key: TELEGRAM_TOKEN
+        value: 7620538088:AAGCKXgtDrzfg2jUnAY4WYp9rgwxNy6oOOE
+      - key: WEB_APP_URL
+        value: https://peacemissile-game-ui.onrender.com
+      - key: RENDER
+        value: true 
