@@ -353,6 +353,26 @@ def save_score():
         print(f"[LOG] Skor kaydetme endpoint hatası: {e}")
         return jsonify({"error": "Server error"}), 500
 
+# Kullanıcı cüzdan adresi kaydetme endpointi
+@app.route('/save_wallet', methods=['POST'])
+def save_wallet():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        wallet_address = data.get('wallet_address')
+        if not user_id or not wallet_address:
+            return jsonify({'error': 'Missing user_id or wallet_address'}), 400
+        if db is not None:
+            user_ref = db.collection('users').document(str(user_id))
+            user_ref.set({'wallet_address': wallet_address}, merge=True)
+            print(f"[LOG] Cüzdan adresi kaydedildi: user_id={user_id}, wallet={wallet_address}")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Database not available'}), 500
+    except Exception as e:
+        print(f"[LOG] Cüzdan kaydetme hatası: {e}")
+        return jsonify({'error': 'Server error'}), 500
+
 @app.route('/webhook-7f3a2b1c', methods=['POST'])
 def telegram_webhook():
     update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
