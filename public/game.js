@@ -298,6 +298,49 @@ class LobbyScene extends Phaser.Scene {
         statsY += smallFontSize + 9;
         this.add.text(statsX, statsY, `MNW Coins: ${userStats.total_pmno_coins}`, { font: `${smallFontSize}px monospace`, fill: statColor, align: 'right' }).setOrigin(1, 0);
 
+        // Cüzdan adresi gösterimi ve bağlama butonu
+        let walletY = statsY + smallFontSize + 16;
+        const walletFontSize = smallFontSize;
+        let walletText = this.add.text(statsX, walletY, '', { font: `${walletFontSize}px monospace`, fill: '#43f3c7', align: 'right' }).setOrigin(1, 0);
+
+        // Eğer userStats.wallet_address varsa göster
+        if (userStats.wallet_address) {
+            walletText.setText(`Wallet: ${userStats.wallet_address.slice(0, 8)}...`);
+        } else {
+            walletText.setText('Wallet: Not connected');
+        }
+
+        const walletBtn = this.add.text(statsX, walletY + walletFontSize + 8, '🔗 Cüzdanını Bağla', {
+            font: `${walletFontSize}px monospace`,
+            fill: '#fff',
+            backgroundColor: '#1a1a1a',
+            padding: { left: 10, right: 10, top: 4, bottom: 4 },
+            align: 'right'
+        }).setOrigin(1, 0).setInteractive({ cursor: 'pointer' });
+
+        walletBtn.on('pointerup', async () => {
+            // Kullanıcıdan cüzdan adresi iste
+            const address = prompt('Telegram Wallet adresinizi girin:');
+            if (!address) return;
+            // Backend'e kaydet
+            try {
+                const response = await fetch('https://peacebot-641906716058.europe-central2.run.app/save_wallet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser.id, wallet_address: address })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    walletText.setText(`Wallet: ${address.slice(0, 8)}...`);
+                    alert('Cüzdan adresiniz kaydedildi!');
+                } else {
+                    alert('Cüzdan adresi kaydedilemedi: ' + (result.error || 'Bilinmeyen hata'));
+                }
+            } catch (e) {
+                alert('Cüzdan adresi kaydedilemedi: ' + e.message);
+            }
+        });
+
         // --- 4. Merkezi Elemanlar ---
 
         // "Start Mission" Butonu
