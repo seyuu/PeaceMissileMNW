@@ -353,18 +353,14 @@ def save_score():
         print(f"[LOG] Skor kaydetme endpoint hatası: {e}")
         return jsonify({"error": "Server error"}), 500
 
+@app.route('/webhook-7f3a2b1c', methods=['POST'])
+def telegram_webhook():
+    update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
+    if update:
+        bot.process_new_updates([update])
+    return '', 200
+
 if __name__ == "__main__":
     print("[LOG] Bot başlatılıyor...")
-    
-    # Port'u ortam değişkeninden al, varsayılan 5000
     port = int(os.environ.get('PORT', 5000))
-    print(f"[LOG] Flask port: {port}")
-    
-    # Flask'ı ayrı thread'de çalıştır
-    import threading
-    flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=port, debug=False))
-    flask_thread.daemon = True
-    flask_thread.start()
-    
-    # Bot'u ana thread'de çalıştır
-    bot.polling(none_stop=True, timeout=60)
+    app.run(host='0.0.0.0', port=port, debug=False)
