@@ -22,7 +22,7 @@ Telegram WebApp oyunu - Füzeleri güvercinlere çevirerek barış getirin!
    FIREBASE_CREDS_BASE64=your_base64_firebase_creds
    ```
 
-2. ** Deploy **:
+2. ** Deploy **: 
    ```bash
    gcloud builds submit --tag gcr.io/PROJECT_ID/peacebot
    gcloud run deploy peacebot --image gcr.io/PROJECT_ID/peacebot --platform managed --region europe-central2 --allow-unauthenticated
