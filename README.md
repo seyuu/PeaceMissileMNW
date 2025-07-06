@@ -6,7 +6,7 @@ Telegram WebApp oyunu - Füzeleri güvercinlere çevirerek barış getirin!
 
 - **Telegram WebApp**: Doğrudan Telegram içinde oynanabilir
 - **Skor Sistemi**: Yüksek skorlar ve toplam puanlar
-- **PMNOFO Coins**: Oyun içi para sistemi
+- **MNW Coins**: Oyun içi para sistemi
 - **Leaderboard**: En iyi oyuncular
 - **Güvenli**: Telegram initData doğrulaması
 
