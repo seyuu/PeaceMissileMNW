@@ -2,7 +2,7 @@
 async function initAnalytics() {
   try {
     // Bot config'ini backend'den al
-    const response = await fetch('/get_bot_config');
+    const response = await fetch('https://peacebot-641906716058.europe-central2.run.app/get_bot_config');
     const config = await response.json();
     
     var s = document.createElement('script');
@@ -102,7 +102,7 @@ async function initFirebase() {
     console.log("Firebase config alınıyor...");
     
     // Firebase config'ini backend'den al
-    const response = await fetch('/get_firebase_config');
+    const response = await fetch('https://peacebot-641906716058.europe-central2.run.app/get_firebase_config');
     const firebaseConfig = await response.json();
     
     console.log("Firebase başlatılıyor...");
