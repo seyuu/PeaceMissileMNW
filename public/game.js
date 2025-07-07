@@ -1,27 +1,4 @@
 // --- TELEGRAM MINI APPS ANALYTICS SDK ENTEGRASYONU ---
-async function initAnalytics() {
-  try {
-    // Bot config'ini backend'den al
-    const response = await fetch('https://peacebot-641906716058.europe-central2.run.app/get_bot_config');
-    const config = await response.json();
-    
-    var s = document.createElement('script');
-    s.src = "https://cdn.jsdelivr.net/npm/@tma.js/analytics@latest";
-    s.onload = function() {
-      tma.analytics.init({
-        botUsername: config.bot_username,
-        accessToken: config.access_token
-      });
-      tma.analytics.send('app_open');
-    };
-    document.head.appendChild(s);
-  } catch (error) {
-    console.error('Analytics başlatılamadı:', error);
-  }
-}
-
-// Analytics'i başlat
-initAnalytics();
 
 // Telegram WebApp context kontrolü
 let tg = window.Telegram && window.Telegram.WebApp;
